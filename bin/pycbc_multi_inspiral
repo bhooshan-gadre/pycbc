@@ -114,6 +114,7 @@ from pycbc.vetoes.sgchisq import SingleDetSGChisq
 pycbc.opt.insert_optimization_option_group(parser)
 pycbc.inject.insert_injfilterrejector_option_group_multi_ifo(parser)
 SingleDetSGChisq.insert_option_group(parser)
+vetoes.SingleDetAmbiguityChisq.insert_option_group(parser)
 opt = parser.parse_args()
 
 # Use the time in the middle of the segment to calculate the antenna patterns.
@@ -158,7 +159,7 @@ def pycbc_reweight_snr(network_snr, network_chisq, a = 3, b = 1. / 6.):
     Output: reweighted_snr: Reweighted SNR for each trigger
     Input:  network_snr:  Dictoinary of coincident or coherent SNR for each
                           trigger
-            network_chisq: A chisq value for each trigger 
+            network_chisq: A chisq value for each trigger
     """
     denom = ((1 + network_chisq)**a) / 2
     reweighted_snr = network_snr / denom**b
@@ -333,6 +334,7 @@ with ctx:
     fft.from_cli(opt)
     # Set some often used variables for easy access
     flow = opt.low_frequency_cutoff
+    fmax = opt.sample_rate/2.
     flow_dict = defaultdict(lambda : flow)
     for count, ifo in enumerate(opt.instruments):
         if count == 0:
@@ -399,6 +401,19 @@ with ctx:
                                          opt.autochi_number_points,
                                          onesided=opt.autochi_onesided)
 
+# Separate bank for ambiguity chisq due to out=template_mem. This gives
+# problems.
+    ambi_bank = waveform.FilterBank(opt.ambi_veto_bank_file, flen, delta_f,
+        low_frequency_cutoff=None if opt.enable_bank_start_frequency else flow,
+        dtype=complex64, phase_order=opt.order,
+        taper=opt.taper_template, approximant=opt.approximant,
+        max_template_length=opt.max_template_length,
+        enable_compressed_waveforms=True if opt.use_compressed_waveforms else False,
+        waveform_decompression_method=
+        opt.waveform_decompression_method if opt.use_compressed_waveforms else None)
+
+    ambiguity_chisq = vetoes.SingleDetAmbiguityChisq.from_cli(opt, ambi_bank)
+
     logging.info("Overwhitening frequency-domain data segments")
     for ifo in opt.instruments:
         for seg in segments[ifo]:
@@ -422,7 +437,11 @@ with ctx:
         'bank_chisq'     : None,
         'bank_chisq_dof' : None,
         'cont_chisq'     : None,
+        'ambiguity_chisq'     : None,
+        'ambiguity_chisq_dof' : None,
                }
+    ifo_out_types.update(vetoes.SingleDetAmbiguityChisq.returns)
+
     ifo_names = sorted(ifo_out_vals.keys())
 
     network_out_types = {
@@ -487,7 +506,7 @@ with ctx:
         for s_num,stilde in enumerate(segments[opt.instruments[0]]):
             stilde = {ifo : segments[ifo][s_num] for ifo in opt.instruments}
             # Filter check checks the 'inj_filter_rejector' options to
-            # determine whether to filter this template/segment 
+            # determine whether to filter this template/segment
             # if injections are present.
             analyse_segment = True
             for ifo in opt.instruments:
@@ -502,7 +521,7 @@ with ctx:
             sigmasq = {ifo : template.sigmasq(segments[ifo][s_num].psd)
                       for ifo in opt.instruments}
             sigma = {ifo : np.sqrt(sigmasq[ifo]) for ifo in opt.instruments}
-            # Every time s_num is zero or we skip the segment, we run new 
+            # Every time s_num is zero or we skip the segment, we run new
             # template to increment the template index
             if s_num==0:
                 event_mgr.new_template(tmplt=template.params, sigmasq=sigmasq)
@@ -521,7 +540,7 @@ with ctx:
                              (t_num + 1, len(bank), ifo))
                 # No clustering in the coherent search until the end.
                 # The correlation vector is the FFT of the snr (so inverse FFT
-                # it to get the snr). 
+                # it to get the snr).
                 snr_ts[ifo], norm_dict[ifo], corr_dict[ifo], idx[ifo],\
                     snrv_dict[ifo] = matched_filter[ifo].matched_filter_and_cluster(
                             s_num, template.sigmasq(stilde[ifo].psd),
@@ -632,7 +651,7 @@ with ctx:
                         template)
 
                 # Calculate network chisq value
-                network_chisq_dict = network_chisq(chisq, chisq_dof, 
+                network_chisq_dict = network_chisq(chisq, chisq_dof,
                                               coherent_ifo_triggers)
 
                 # Calculate chisq reweighted SNR
@@ -654,6 +673,9 @@ with ctx:
                 num_events = len(reweighted_snr)
 
                 for ifo in opt.instruments:
+                    ifo_out_vals['ambiguity_chisq'], ifo_out_vals['ambiguity_chisq_dof'] = \
+                            ambiguity_chisq.values(coherent_ifo_triggers[ifo], coinc_idx+stilde[ifo].analyze.start,
+                                    template, stilde[ifo], stilde[ifo].psd)
                     ifo_out_vals['bank_chisq'], ifo_out_vals['bank_chisq_dof'] =\
                         bank_chisq.values(template, stilde[ifo].psd, stilde[ifo],
                                          coherent_ifo_triggers[ifo] /

@@ -207,6 +207,7 @@ fft.insert_fft_option_group(parser)
 pycbc.opt.insert_optimization_option_group(parser)
 pycbc.inject.insert_injfilterrejector_option_group(parser)
 SingleDetSGChisq.insert_option_group(parser)
+vetoes.SingleDetAmbiguityChisq.insert_option_group(parser)
 opt = parser.parse_args()
 
 # Check that the values returned for the options make sense
@@ -245,6 +246,7 @@ with ctx:
         fft.fftw.import_double_wisdom_from_filename(opt.fftw_input_double_wisdom_file)
 
     flow = opt.low_frequency_cutoff
+    fmax = opt.sample_rate/2.
     flen = strain_segments.freq_len
     tlen = strain_segments.time_len
     delta_f = strain_segments.delta_f
@@ -267,6 +269,7 @@ with ctx:
         'psd_var_val'    : float32,
                 }
     out_types.update(SingleDetSGChisq.returns)
+    out_types.update(vetoes.SingleDetAmbiguityChisq.returns)
     out_vals = {key: None for key in out_types}
     names = sorted(out_vals.keys())
 
@@ -284,7 +287,7 @@ with ctx:
     if opt.psdvar_segment is not None:
         logging.info("Calculating PSD variation")
         psd_var = pycbc.psd.calc_filt_psd_variation(gwstrain, opt.psdvar_segment,
-                opt.psdvar_short_segment, opt.psdvar_long_segment, 
+                opt.psdvar_short_segment, opt.psdvar_long_segment,
                 opt.psdvar_psd_duration, opt.psdvar_psd_stride,
                 opt.psd_estimation, opt.psdvar_low_freq, opt.psdvar_high_freq)
 
@@ -354,6 +357,19 @@ with ctx:
                                  reverse_template=opt.autochi_reverse_template,
                                  take_maximum_value=opt.autochi_max_valued,
                                  maximal_value_dof=opt.autochi_max_valued_dof)
+
+# Separate bank for ambiguity chisq due to out=template_mem. This gives
+# problems.
+    ambi_bank = waveform.FilterBank(opt.ambi_veto_bank_file, flen, delta_f,
+        low_frequency_cutoff=None if opt.enable_bank_start_frequency else flow,
+        dtype=complex64, phase_order=opt.order,
+        taper=opt.taper_template, approximant=opt.approximant,
+        max_template_length=opt.max_template_length,
+        enable_compressed_waveforms=True if opt.use_compressed_waveforms else False,
+        waveform_decompression_method=
+        opt.waveform_decompression_method if opt.use_compressed_waveforms else None)
+
+    ambiguity_chisq = vetoes.SingleDetAmbiguityChisq.from_cli(opt, ambi_bank)
 
     logging.info("Overwhitening frequency-domain data segments")
     for seg in segments:
@@ -444,6 +460,10 @@ with ctx:
                                    stilde.psd, norm, stilde=stilde,
                                    low_frequency_cutoff=flow)
 
+            out_vals['ambiguity_chisq'], out_vals['ambiguity_chisq_dof'] = \
+                    ambiguity_chisq.values(snrv * norm, idx+stilde.analyze.start,
+                            template, stilde, stilde.psd)
+
             idx += stilde.cumulative_index
 
             out_vals['time_index'] = idx
@@ -471,7 +491,7 @@ with ctx:
         if opt.checkpoint_exit_maxtime and \
             (time.time() - tstart > opt.checkpoint_exit_maxtime):
             event_mgr.save_state(t_num, opt.output + '.checkpoint')
-            sys.exit(opt.checkpoint_exit_code)           
+            sys.exit(opt.checkpoint_exit_code)
 
 event_mgr.consolidate_events(opt, gwstrain=gwstrain)
 event_mgr.finalize_events()
