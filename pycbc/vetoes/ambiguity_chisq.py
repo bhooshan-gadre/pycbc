@@ -75,17 +75,17 @@ def get_vector(snr, snr_id, seg_snrs, cov_gh):
 def get_chisq(vec, eig, rot_mat, threshold=1e-2):
     ## Variaous conditions to impose sane chisq and DoF
     # rel_eig = eig/eig[-1] > threshold
-    rel_eig = eig/eig[-1] > 1.0/100.0
+    rel_eig = eig/eig[-1] > 1.0/10.0
     # rel_eig = eig > threshold
     dof = rel_eig.sum()
     rot_vec = np.dot(vec, rot_mat)
     chi =(rot_vec[rel_eig]**2.0/eig[rel_eig]).sum()
 
-    if chi / dof > 4:
+    # if chi / dof > 4:
         # print("eig for chi = {}".format(chi/dof))
-        print(eig[rel_eig])
-        # print('min, max, ratio')
-        print(eig[rel_eig][0], eig[rel_eig][-1], eig[rel_eig][-1]/eig[rel_eig][0])
+        # print(eig[rel_eig])
+    print('min, max, ratio')
+    print(eig[rel_eig][0], eig[rel_eig][-1], eig[rel_eig][-1]/eig[rel_eig][0])
 
     return chi, dof
 
@@ -237,7 +237,7 @@ class SingleDetAmbiguityChisq(object):
                 cond_thre = condition_threshold if condition_threshold else self.condition_threshold
                 logging.info('Computing ambiguity chi-squares ...')
                 chisq, dof = compute_chisq(snrs[rel_ids], snr_ids[rel_ids], seg_snrs, cov_gg, cov_gh, cond_thre)
-
+                print(chisq/dof, dof)
                 return chisq/dof, dof
             else:
                 return None, None
