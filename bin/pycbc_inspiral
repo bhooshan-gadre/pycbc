@@ -358,22 +358,36 @@ with ctx:
                                  take_maximum_value=opt.autochi_max_valued,
                                  maximal_value_dof=opt.autochi_max_valued_dof)
 
-# Separate bank for ambiguity chisq due to out=template_mem. This gives
-# problems.
-    ambi_bank = waveform.FilterBank(opt.ambi_veto_bank_file, flen, delta_f,
-        low_frequency_cutoff=None if opt.enable_bank_start_frequency else flow,
-        dtype=complex64, phase_order=opt.order,
-        taper=opt.taper_template, approximant=opt.approximant,
-        max_template_length=opt.max_template_length,
-        enable_compressed_waveforms=True if opt.use_compressed_waveforms else False,
-        waveform_decompression_method=
-        opt.waveform_decompression_method if opt.use_compressed_waveforms else None)
-
-    ambiguity_chisq = vetoes.SingleDetAmbiguityChisq.from_cli(opt, ambi_bank)
-
     logging.info("Overwhitening frequency-domain data segments")
     for seg in segments:
         seg /= seg.psd
+
+# Separate bank for ambiguity chisq due to out=template_mem. This gives
+# problems.
+    if opt.ambi_status:
+        logging.info("Read in template bank for ambiguity chisq")
+        # ambi_template_mem = zeros(tlen, dtype = complex64)
+        ambi_bank = waveform.FilterBank(opt.ambi_veto_bank_file, flen, delta_f,
+            low_frequency_cutoff=None if opt.enable_bank_start_frequency else flow,
+            dtype=complex64, phase_order=opt.order,
+            taper=opt.taper_template, approximant=opt.approximant,
+            # out=ambi_template_mem,  ## This line should be commented if MatchedFilterControl is not used
+            max_template_length=opt.max_template_length,
+            enable_compressed_waveforms=True if opt.use_compressed_waveforms else False,
+            waveform_decompression_method=
+            opt.waveform_decompression_method if opt.use_compressed_waveforms else None)
+
+        # ambi_matched_filter = MatchedFilterControl(opt.low_frequency_cutoff, None,
+        #                             0.0, tlen, delta_f, complex64,
+        #                             segments, ambi_template_mem, use_cluster=False,
+        #                             downsample_factor=opt.downsample_factor,
+        #                             upsample_threshold=opt.upsample_threshold,
+        #                             upsample_method=opt.upsample_method,
+        #                             gpu_callback_method=opt.gpu_callback_method,
+        #                             cluster_function=opt.cluster_function)
+
+        ambiguity_chisq = vetoes.SingleDetAmbiguityChisq.from_cli(opt, ambi_bank) #, ambi_matched_filter)
+
 
     logging.info("Read in template bank")
     bank = waveform.FilterBank(opt.bank_file, flen, delta_f,
@@ -460,9 +474,13 @@ with ctx:
                                    stilde.psd, norm, stilde=stilde,
                                    low_frequency_cutoff=flow)
 
-            out_vals['ambiguity_chisq'], out_vals['ambiguity_chisq_dof'] = \
-                    ambiguity_chisq.values(snrv * norm, idx+stilde.analyze.start,
-                            template, stilde, stilde.psd)
+            if opt.ambi_status:
+                out_vals['ambiguity_chisq'], out_vals['ambiguity_chisq_dof'] = \
+                        ambiguity_chisq.values(snrv * norm, idx+stilde.analyze.start,
+                                template, stilde, stilde.psd)
+            else:
+                out_vals['ambiguity_chisq'], out_vals['ambiguity_chisq_dof'] = \
+                        numpy.repeat(1.0, len(idx)), numpy.repeat(1, len(idx))
 
             idx += stilde.cumulative_index
 

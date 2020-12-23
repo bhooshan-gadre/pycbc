@@ -30,6 +30,12 @@ def segment_snrs(filters, stilde, psd, flow, fhigh):
     snr (list): List of snr time series.
     """
     snrs = []
+    # snr, norm, corr, idx, snrv = \
+    #     matched_filter.matched_filter_and_cluster(s_num,
+    #                                                 template.sigmasq(stilde.psd),
+    #                                                 cluster_window,
+    #                                                 epoch=stilde._epoch)
+    # snrs.append(snrv * norm)
 
     for template in filters:
         snr = pf.matched_filter(template, stilde, None, flow, fhigh, pf.sigmasq(template, psd, flow, fhigh))
@@ -131,7 +137,10 @@ def inner(vec1, vec2, psd=None,
 
 class SingleDetAmbiguityChisq(object):
     returns = {'ambiguity_chisq': np.float32, 'ambiguity_chisq_dof' : np.int}
-    def __init__(self, status, bank, snr_threshold, flow, fmax, mc_bound, eta_bound, chie_bound, min_filters, max_filters, time_indices=[0], condition_threshold=1.0e-2, per_template=False):
+    # def __init__(self, status, bank, match_class, snr_threshold, flow, fmax,
+    def __init__(self, status, bank, snr_threshold, flow, fmax,
+            mc_bound, eta_bound, chie_bound, min_filters, max_filters,
+            time_indices=[0], condition_threshold=1.0e-2, per_template=False, use_full_bank=True):
         if status:
             self.do = True
 
@@ -141,16 +150,31 @@ class SingleDetAmbiguityChisq(object):
             self.condition_threshold = condition_threshold
             self.min_filters = min_filters
             self.max_filters = max_filters
+            self.matched_filter = match_class  ## Instance of pf.MatchedFilterControl
             self.flow = flow
             self.fmax = fmax
+
+            if ('mchirp' not in bank.table.fieldnames) or  ('eta' not in bank.table.fieldnames):
+                mchirp, eta = pnu.mass1_mass2_to_mchirp_eta(bank.table['mass1'], bank.table['mass2'])
+                if 'mchirp' not in bank.table.fieldnames:
+                    bank.table.add_fields(mchirp, 'mchirp')
+                if 'eta' not in bank.table.fieldnames:
+                    bank.table.add_fields(eta, 'eta')
+            if 'chi_eff' not in bank.table.fieldnames:
+                chie = chi_eff(bank.table['mass1'], bank.table['mass2'], bank.table['spin1z'], bank.table['spin2z'])
+                bank.table.add_fields(chie, 'chi_eff')
             self.bank = bank
-            if per_template:
-                # self.choose_filters = filters_for_template(self.bank, min_filters, max_filters)
-                self.choose_filters = FiltersForTemplate(self.bank, mc_bound=mc_bound, eta_bound=eta_bound, chie_bound=chie_bound ,min_filters=min_filters, max_filters=max_filters)
-                self.get_filters = self.choose_filters.get_relevant_filters
+            self.use_full_bank = use_full_bank
+            if use_full_bank:
+                self.get_filters = self.get_full_bank
             else:
-                self.choose_filters = FiltersRegions(self.bank, mc_bound=mc_bound, eta_bound=eta_bound, chie_bound=chie_bound ,min_filters=min_filters, max_filters=max_filters)
-                self.get_filters = self.choose_filters.get_relevant_filters
+                if per_template:
+                    # self.choose_filters = filters_for_template(self.bank, min_filters, max_filters)
+                    self.choose_filters = FiltersForTemplate(self.bank, mc_bound=mc_bound, eta_bound=eta_bound, chie_bound=chie_bound ,min_filters=min_filters, max_filters=max_filters)
+                    self.get_filters = self.choose_filters.get_relevant_filters
+                else:
+                    self.choose_filters = FiltersRegions(self.bank, mc_bound=mc_bound, eta_bound=eta_bound, chie_bound=chie_bound ,min_filters=min_filters, max_filters=max_filters)
+                    self.get_filters = self.choose_filters.get_relevant_filters
 
             self.time_idices = np.array(time_indices) # Currently only trigger time = 0 indices are supported
             self._cache_seg_snrs = {} # seg_snrs
@@ -161,12 +185,13 @@ class SingleDetAmbiguityChisq(object):
             self.do = False
 
     @staticmethod
-    def insert_option_group(parser):
+    def insert_argsion_group(parser):
         group = parser.add_argument_group("ambiguity chi-square")
         group.add_argument("--ambi-status", action="store_true", default=True)
         group.add_argument("--ambi-snr-threshold", type=float,
             help="Minimum SNR threshold to use SG chisq")
         group.add_argument("--ambi-veto-bank-file", type=str, help="bank file for ambiguity chisq")
+        group.add_argument("--ambi-veto-use-full-bank", action="store_true", default=True)
         group.add_argument("--ambi-min-filters", type=int, default=10,
                 help="maximum filters to be used for ambiguity chisq from the veto bank")
         group.add_argument("--ambi-max-filters", type=int, default=30,
@@ -177,7 +202,7 @@ class SingleDetAmbiguityChisq(object):
         group.add_argument("--ambi-per-template", action="store_true", default=False)
 
     @classmethod
-    def from_cli(cls, args, bank):
+    def from_cli(cls, args, bank): # , match_class):
         flow = args.low_frequency_cutoff
         fmax = args.sample_rate/2.
         mc_bound = args.ambi_mc_bins if args.ambi_mc_bins else []
@@ -186,7 +211,24 @@ class SingleDetAmbiguityChisq(object):
         mc_bound.sort()
         eta_bound.sort()
         chie_bound.sort()
-        return cls(args.ambi_status, bank, args.ambi_snr_threshold, flow, fmax, mc_bound, eta_bound, chie_bound, args.ambi_min_filters, args.ambi_max_filters, per_template=args.ambi_per_template)
+        return cls(args.ambi_status, bank, args.ambi_snr_threshold, flow, fmax,
+                mc_bound, eta_bound, chie_bound, args.ambi_min_filters, args.ambi_max_filters,
+                per_template=args.ambi_per_template, use_full_bank=args.ambi_veto_use_full_bank)
+        # return cls(args.ambi_status, bank, match_class, args.ambi_snr_threshold, flow, fmax, mc_bound, eta_bound, chie_bound, args.ambi_min_filters, args.ambi_max_filters, per_template=args.ambi_per_template)
+
+    def get_full_bank(self, htilde):
+        mchirp, eta = pnu.mass1_mass2_to_mchirp_eta(htilde.params.mass1, htilde.params.mass2)
+        chie = chi_eff(htilde.params.mass1, htilde.params.mass2, htilde.params.spin1z, htilde.params.spin2z)
+        h_params = {'mchirp': mchirp, 'eta': eta, 'chi_eff': chie}
+        # Just to make sure we are not having the trigger template or a very
+        # close template
+        idx = np.abs(self.bank.table['mchirp'] - h_params['mchirp'])
+        idx += np.abs(self.bank.table['eta'] - h_params['eta'])
+        idx += np.abs(self.bank.table['chi_eff'] - h_params['chi_eff'])
+        idx = (idx > 1.0e-2)
+        filter_list = copy.copy(self.bank)
+        filter_list.table = filter_list.table[idx]
+        return list(filter_list)
 
     def cache_seg_snrs(self, htilde, stilde, psd):  # It is assumed ``filters iff htilde''
         # key = (id(htilde), id(stilde), id(psd))
@@ -240,9 +282,11 @@ class SingleDetAmbiguityChisq(object):
                 print(chisq/dof, dof)
                 return chisq/dof, dof
             else:
-                return None, None
+                return 1.0, 1
+                # return None, None
         else:
-            return None, None
+            return 1.0, 1
+            # return None, None
 
 
 class FiltersRegions(object):
