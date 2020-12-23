@@ -137,7 +137,6 @@ def inner(vec1, vec2, psd=None,
 
 class SingleDetAmbiguityChisq(object):
     returns = {'ambiguity_chisq': np.float32, 'ambiguity_chisq_dof' : np.int}
-    # def __init__(self, status, bank, match_class, snr_threshold, flow, fmax,
     def __init__(self, status, bank, snr_threshold, flow, fmax,
             mc_bound, eta_bound, chie_bound, min_filters, max_filters,
             time_indices=[0], condition_threshold=1.0e-2, per_template=False, use_full_bank=True):
@@ -185,7 +184,7 @@ class SingleDetAmbiguityChisq(object):
             self.do = False
 
     @staticmethod
-    def insert_argsion_group(parser):
+    def insert_option_group(parser):
         group = parser.add_argument_group("ambiguity chi-square")
         group.add_argument("--ambi-status", action="store_true", default=True)
         group.add_argument("--ambi-snr-threshold", type=float,
