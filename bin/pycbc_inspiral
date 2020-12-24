@@ -373,6 +373,7 @@ with ctx:
             taper=opt.taper_template, approximant=opt.approximant,
             # out=ambi_template_mem,  ## This line should be commented if MatchedFilterControl is not used
             max_template_length=opt.max_template_length,
+            cache_filters=True, max_cache_filters=40,
             enable_compressed_waveforms=True if opt.use_compressed_waveforms else False,
             waveform_decompression_method=
             opt.waveform_decompression_method if opt.use_compressed_waveforms else None)

@@ -648,6 +648,7 @@ class FilterBank(TemplateBank):
                  enable_compressed_waveforms=True,
                  low_frequency_cutoff=None,
                  waveform_decompression_method=None,
+                 cache_filters=False, max_cache_filters=50,
                  **kwds):
         self.out = out
         self.dtype = dtype
@@ -660,6 +661,12 @@ class FilterBank(TemplateBank):
         self.max_template_length = max_template_length
         self.enable_compressed_waveforms = enable_compressed_waveforms
         self.waveform_decompression_method = waveform_decompression_method
+        self.cache_filters=cache_filters
+        self.max_cache_filters=max_cache_filters if cache_filters else 0
+        if self.cache_filters:
+            import collections
+            self._filter_cache = collections.OrderedDict()
+            # self._filter_cahce = {}
 
         super(FilterBank, self).__init__(filename, approximant=approximant,
             parameters=parameters, **kwds)
@@ -743,6 +750,13 @@ class FilterBank(TemplateBank):
 
     def __getitem__(self, index):
         # Make new memory for templates if we aren't given output memory
+        tmplt_hash = self.table.template_hash[index]
+
+        if self.cache_filters:
+            if tmplt_hash in self._filter_cache:
+                logging.info("Found cached filter. Using it ...")
+                return self._filter_cache[tmplt_hash]
+
         if self.out is None:
             tempout = zeros(self.filter_length, dtype=self.dtype)
         else:
@@ -800,6 +814,14 @@ class FilterBank(TemplateBank):
         # Add sigmasq as a method of this instance
         htilde.sigmasq = types.MethodType(sigma_cached, htilde)
         htilde._sigmasq = {}
+
+        if self.cache_filters:
+            if tmplt_hash not in self._filter_cache:
+                logging.info("Caching filter as it is not found")
+                if len(self._filter_cache) == self.max_cache_filters:
+                    self._filter_cache.popitem(last=False)
+                self._filter_cache[tmplt_hash] = htilde
+                return self._filter_cache[tmplt_hash]
         return htilde
 
 def find_variable_start_frequency(approximant, parameters, f_start, max_length,

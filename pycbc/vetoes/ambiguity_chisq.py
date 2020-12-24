@@ -30,12 +30,6 @@ def segment_snrs(filters, stilde, psd, flow, fhigh):
     snr (list): List of snr time series.
     """
     snrs = []
-    # snr, norm, corr, idx, snrv = \
-    #     matched_filter.matched_filter_and_cluster(s_num,
-    #                                                 template.sigmasq(stilde.psd),
-    #                                                 cluster_window,
-    #                                                 epoch=stilde._epoch)
-    # snrs.append(snrv * norm)
 
     for template in filters:
         snr = pf.matched_filter(template, stilde, None, flow, fhigh, pf.sigmasq(template, psd, flow, fhigh))
@@ -78,20 +72,18 @@ def get_vector(snr, snr_id, seg_snrs, cov_gh):
         vec[i] = seg_snrs[i][snr_id].real - snr.real*cov_gh[i].real - snr.imag*cov_gh[i].imag
     return vec
 
-def get_chisq(vec, eig, rot_mat, threshold=1e-2):
+def get_chisq(vec, eig, rot_mat, threshold=0.05):
     ## Variaous conditions to impose sane chisq and DoF
-    # rel_eig = eig/eig[-1] > threshold
-    rel_eig = eig/eig[-1] > 1.0/10.0
-    # rel_eig = eig > threshold
+    rel_eig = eig/eig[-1] > threshold
     dof = rel_eig.sum()
     rot_vec = np.dot(vec, rot_mat)
     chi =(rot_vec[rel_eig]**2.0/eig[rel_eig]).sum()
 
     # if chi / dof > 4:
-        # print("eig for chi = {}".format(chi/dof))
-        # print(eig[rel_eig])
-    print('min, max, ratio')
-    print(eig[rel_eig][0], eig[rel_eig][-1], eig[rel_eig][-1]/eig[rel_eig][0])
+        # logging.info("eig for chi = {}".format(chi/dof))
+        # logging.info(eig[rel_eig])
+    logging.info('min, max, ratio')
+    logging.info(eig[rel_eig][0], eig[rel_eig][-1], eig[rel_eig][-1]/eig[rel_eig][0])
 
     return chi, dof
 
@@ -99,11 +91,7 @@ def compute_chisq(snrs, snr_ids, seg_snrs, cov_gg, cov_gh, threshold=1e-3):
     chis, dofs = [], []
     for snr, snr_id in zip(snrs, snr_ids):
         cov = get_cov_matrix(snr, cov_gg, cov_gh)
-#         print "cov:"
-#         print cov
         eig, rot_mat = get_eval_rot_mat(cov)
-#         print "eig:"
-#         print eig
         vec = get_vector(snr, snr_id, seg_snrs, cov_gh)
         chi, dof = get_chisq(vec, eig, rot_mat, threshold)
         chis.append(chi)
@@ -139,7 +127,7 @@ class SingleDetAmbiguityChisq(object):
     returns = {'ambiguity_chisq': np.float32, 'ambiguity_chisq_dof' : np.int}
     def __init__(self, status, bank, snr_threshold, flow, fmax,
             mc_bound, eta_bound, chie_bound, min_filters, max_filters,
-            time_indices=[0], condition_threshold=1.0e-2, per_template=False, use_full_bank=True):
+            time_indices=[0], condition_threshold=1.0e-1, per_template=False, use_full_bank=True):
         if status:
             self.do = True
 
@@ -149,7 +137,6 @@ class SingleDetAmbiguityChisq(object):
             self.condition_threshold = condition_threshold
             self.min_filters = min_filters
             self.max_filters = max_filters
-            self.matched_filter = match_class  ## Instance of pf.MatchedFilterControl
             self.flow = flow
             self.fmax = fmax
 
@@ -188,7 +175,9 @@ class SingleDetAmbiguityChisq(object):
         group = parser.add_argument_group("ambiguity chi-square")
         group.add_argument("--ambi-status", action="store_true", default=True)
         group.add_argument("--ambi-snr-threshold", type=float,
-            help="Minimum SNR threshold to use SG chisq")
+            help="Minimum SNR threshold to use ambi chisq")
+        group.add_argument("--ambi-condition-threshold", type=float, default=0.05,
+            help="Minimum SNR threshold to use ambi chisq")
         group.add_argument("--ambi-veto-bank-file", type=str, help="bank file for ambiguity chisq")
         group.add_argument("--ambi-veto-use-full-bank", action="store_true", default=True)
         group.add_argument("--ambi-min-filters", type=int, default=10,
@@ -212,8 +201,8 @@ class SingleDetAmbiguityChisq(object):
         chie_bound.sort()
         return cls(args.ambi_status, bank, args.ambi_snr_threshold, flow, fmax,
                 mc_bound, eta_bound, chie_bound, args.ambi_min_filters, args.ambi_max_filters,
-                per_template=args.ambi_per_template, use_full_bank=args.ambi_veto_use_full_bank)
-        # return cls(args.ambi_status, bank, match_class, args.ambi_snr_threshold, flow, fmax, mc_bound, eta_bound, chie_bound, args.ambi_min_filters, args.ambi_max_filters, per_template=args.ambi_per_template)
+                per_template=args.ambi_per_template, use_full_bank=args.ambi_veto_use_full_bank,
+                condition_threshold=args.ambi_condition_threshold)
 
     def get_full_bank(self, htilde):
         mchirp, eta = pnu.mass1_mass2_to_mchirp_eta(htilde.params.mass1, htilde.params.mass2)
@@ -224,7 +213,7 @@ class SingleDetAmbiguityChisq(object):
         idx = np.abs(self.bank.table['mchirp'] - h_params['mchirp'])
         idx += np.abs(self.bank.table['eta'] - h_params['eta'])
         idx += np.abs(self.bank.table['chi_eff'] - h_params['chi_eff'])
-        idx = (idx > 1.0e-2)
+        idx = (idx > 1.0e-3)
         filter_list = copy.copy(self.bank)
         filter_list.table = filter_list.table[idx]
         return list(filter_list)
@@ -232,9 +221,9 @@ class SingleDetAmbiguityChisq(object):
     def cache_seg_snrs(self, htilde, stilde, psd):  # It is assumed ``filters iff htilde''
         # key = (id(htilde), id(stilde), id(psd))
         key = (id(htilde), stilde.end_time, id(psd))
-        print("key = (id(htilde), stilde.end_time, psd.end_time)")
-        print(key)
-        print("Above is the key")
+        logging.info("key = (id(htilde), stilde.end_time, psd.end_time)")
+        logging.info(key)
+        logging.info("Above is the key")
         if key not in self._cache_seg_snrs:
             filters = self.get_filters(htilde)
             self._cache_seg_snrs[key] = segment_snrs(filters, stilde, psd, self.flow, self.fmax)  ## Assumed data is overwhitened
@@ -278,14 +267,12 @@ class SingleDetAmbiguityChisq(object):
                 cond_thre = condition_threshold if condition_threshold else self.condition_threshold
                 logging.info('Computing ambiguity chi-squares ...')
                 chisq, dof = compute_chisq(snrs[rel_ids], snr_ids[rel_ids], seg_snrs, cov_gg, cov_gh, cond_thre)
-                print(chisq/dof, dof)
+                logging.info(chisq/dof, dof)
                 return chisq/dof, dof
             else:
-                return 1.0, 1
-                # return None, None
+                return None, None
         else:
-            return 1.0, 1
-            # return None, None
+            return None, None
 
 
 class FiltersRegions(object):
@@ -408,44 +395,3 @@ class FiltersForTemplate(object):
         key = id(htilde)
         if key in self._cache_relevant_filters:
             del self._cache_relevant_filters[key]
-
-# class filters_for_template(object):
-#     def __init__(self, bank, min_filters=10, max_filters=20, nudge=0.2):
-#         self.bank = bank
-#         bank_tau0, bank_tau3 = pnu.mass1_mass2_to_tau0_tau3(bank.table['mass1'], bank.table['mass2'], bank.table['f_lower'])
-#         self.bank_tau = bank_tau0 - bank_tau3
-#         self.min_filters = min_filters
-#         self.max_filters = max_filters
-#         self.nudge = nudge
-#         self._cache_relevant_filters = {}
-#
-#     def get_relevant_filters(self, htilde, tau0=None, tau3=None, delta_region=1e-1):
-#         logging.info("Getting relevant templates")
-#         key = id(htilde)
-#         if key not in self._cache_relevant_filters:
-#             try:
-#                 trig_tau0, trig_tau3 = pnu.mass1_mass2_to_tau0_tau3(htilde.params.mass1, htilde.params.mass2, htilde.params.f_lower)
-#                 tau = trig_tau0 - trig_tau3
-#             except:
-#                 tau = tau0 - tau3
-#
-#             err = 1e-5
-#             idx = (np.abs(self.bank_tau - tau) <= delta_region) * (np.abs(self.bank_tau - tau) > err)
-#             while (idx.sum() > self.max_filters) + (idx.sum() < self.min_filters):
-#                 if idx.sum() > self.max_filters:
-#                     delta_region *= (1-self.nudge)
-#                     idx = (np.abs(self.bank_tau - tau) <= delta_region) * (np.abs(self.bank_tau - tau) > err)
-#                 elif idx.sum() < self.min_filters:
-#                     delta_region *= (1.0 + self.nudge)
-#                     idx = (np.abs(self.bank_tau - tau) <= delta_region) * (np.abs(self.bank_tau - tau) > err)
-#
-#             filter_list = copy.copy(self.bank)
-#             filter_list.table = filter_list.table[idx]
-#             self._cache_relevant_filters[key] = filter_list # list of filters to be used in chisq
-#         logging.info("Getting relevant templates... Done!")
-#         return self._cache_relevant_filters[key]
-#
-#     def clear_filters(self, htilde):
-#         key = id(htilde)
-#         if key in self._cache_relevant_filters:
-#             del self._cache_relevant_filters[key]
