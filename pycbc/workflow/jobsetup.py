@@ -106,6 +106,7 @@ def select_matchedfilter_class(curr_exe):
     exe_to_class_map = {
         'pycbc_inspiral'          : PyCBCInspiralExecutable,
         'pycbc_inspiral_skymax'   : PyCBCInspiralExecutable,
+        'pycbc_inspiral_trdata'   : PyCBCInspiralExecutable,
         'pycbc_multi_inspiral'    : PyCBCMultiInspiralExecutable,
     }
     try:
