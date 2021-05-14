@@ -1094,7 +1094,7 @@ class StrainSegments(object):
             self._fourier_segments_tr = []
             for seg_slice, ana in zip(self.segment_slices, self.analyze_slices):
                 if seg_slice.start >= 0 and seg_slice.stop <= len(self.strain):
-                    strain_slice = TimeSeries(zeros(len(self.strain[seg_slice].data), dtype=strain.dtype), delta_t=strain.delta_t, epoch=self.strain[seg_slice]._epoch)
+                    strain_slice = TimeSeries(zeros(len(self.strain[seg_slice].data), dtype=self.strain.dtype), delta_t=self.strain.delta_t, epoch=self.strain[seg_slice]._epoch)
                     strain_slice.data = self.strain[seg_slice].data[::-1]
                     freq_seg = make_frequency_series(strain_slice)
                 # Assume that we cannot have a case where we both zero-pad on
@@ -1102,12 +1102,12 @@ class StrainSegments(object):
                 elif seg_slice.start < 0:
                     strain_chunk = self.strain[:seg_slice.stop]
                     strain_chunk.prepend_zeros(-seg_slice.start)
-                    strain_slice = TimeSeries(strain_chunk.data, delta_t=strain.delta_t, epoch=strain_chunk._epoch)
+                    strain_slice = TimeSeries(strain_chunk.data, delta_t=strain_chunk.delta_t, epoch=strain_chunk._epoch)
                     freq_seg = make_frequency_series(strain_slice)
                 elif seg_slice.stop > len(self.strain):
                     strain_chunk = self.strain[seg_slice.start:]
                     strain_chunk.append_zeros(seg_slice.stop - len(self.strain))
-                    strain_slice = TimeSeries(strain_chunk.data, delta_t=strain.delta_t, epoch=strain_chunk._epoch)
+                    strain_slice = TimeSeries(strain_chunk.data, delta_t=strain_chunk.delta_t, epoch=strain_chunk._epoch)
                     freq_seg = make_frequency_series(strain_slice)
                 freq_seg.analyze = ana
                 freq_seg.cumulative_index = seg_slice.start + ana.start
