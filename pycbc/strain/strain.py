@@ -919,6 +919,7 @@ class StrainSegments(object):
             for analysis.
         """
         self._fourier_segments = None
+        self._fourier_segments_tr = None
         self.strain = strain
 
         self.delta_t = strain.delta_t
