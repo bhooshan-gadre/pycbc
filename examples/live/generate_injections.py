@@ -34,7 +34,8 @@ samples['distance'] = [178., 79.]
 samples['ra'] = [np.deg2rad(45), np.deg2rad(10)]
 samples['dec'] = [np.deg2rad(45), np.deg2rad(-45)]
 
-samples['approximant'] = ['SEOBNRv4_opt', 'SpinTaylorT4']
+# samples['approximant'] = ['SEOBNRv4_opt', 'SpinTaylorT4']
+samples['approximant'] = ['IMRPhenomD', 'SpinTaylorT4']
 
 InjectionSet.write('injections.hdf', samples, static_args=static_params,
                    injtype='cbc', cmd=" ".join(sys.argv))
