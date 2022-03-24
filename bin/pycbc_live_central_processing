@@ -765,9 +765,9 @@ with ctx:
                    for ifo in ifos}
 
     strain_len = int(maxlen * args.sample_rate)
-	strain0 = TimeSeries(zeros(strain_len), delta_t=1.0/args.sample_rate, epoch=args.start_time-args.max_length, dtype=numpy.float32)
-	psd_len = int(args.psd_segment_length * args.sample_rate // 2 + 1)
-	psd0 = FrequencySeries(zeros(psd_len), delta_f=1./args.psd_segment_length, dtype=numpy.complex64)
+    strain0 = TimeSeries(zeros(strain_len), delta_t=1.0/args.sample_rate, epoch=args.start_time-args.max_length, dtype=numpy.float32)
+    psd_len = int(args.psd_segment_length * args.sample_rate // 2 + 1)
+    psd0 = FrequencySeries(zeros(psd_len), delta_f=1./args.psd_segment_length, dtype=numpy.complex64)
     data_to_filter = {ifo: OverwhitenedStrain(ifo, evnt.rank, strain0, psd0,
         start_time=args.start_time, sample_rate=args.sample_rate,
         trim_padding=args.trim_padding, blocksize=valid_pad) for ifo in ifos}
@@ -845,12 +845,12 @@ with ctx:
 
                 if evnt.rank == 0:
                     df_extreme = 2. / data_reader[ifo].strain.duration
-					stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
+                    stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
                     data_to_filter[ifo] = OverwhitenedStrain(ifo, rank, ov_data, data_reader[ifo].psd, start_time=args.start_time, sample_rate=args.sample_rate, trim_padding=args.trim_padding, blocksize=args.blocksize)
 
-				evnt.comm.Bcast([data_to_filter[ifo].strain.data, MPI.DOUBLE],root=0)
-				evnt.comm.Bcast([data_to_filter[ifo].strain.start_time, MPI.DOUBLE],root=0)
-				evnt.comm.Bcast([data_to_filter[ifo].psd.data, MPI.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].strain.data, MPI.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].strain.start_time, MPI.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].psd.data, MPI.DOUBLE],root=0)
 
 
                 if evnt.rank > 0:

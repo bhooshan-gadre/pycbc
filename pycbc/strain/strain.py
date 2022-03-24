@@ -1571,7 +1571,7 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         logging.info("Recalculating %s PSD, %s", self.detector, psd.dist)
         return True
 
-    def overwhitened_data(self, delta_f):
+    def overwhitened_data(self, delta_f, return_ts=False):
         """ Return overwhitened data
 
         Parameters
@@ -1585,7 +1585,7 @@ class StrainBuffer(pycbc.frame.DataBuffer):
             Overwhited strain data
         """
         # we haven't already computed htilde for this delta_f
-        if delta_f not in self.segments:
+        if delta_f not in self.segments or return_ts:
             buffer_length = int(1.0 / delta_f)
             e = len(self.strain)
             s = int(e - buffer_length * self.sample_rate - self.reduced_pad * 2)
@@ -1611,10 +1611,14 @@ class StrainBuffer(pycbc.frame.DataBuffer):
             fseries /= psd.psdt
 
             # trim ends of strain
-            if self.reduced_pad  != 0:
+            if self.reduced_pad  != 0 or return_ts:
                 overwhite = TimeSeries(zeros(e-s, dtype=self.strain.dtype),
                                              delta_t=self.strain.delta_t)
                 pycbc.fft.ifft(fseries, overwhite)
+                if return_ts and not self.reduced_pad != 0:
+                    stilde = self.segments[delta_f]
+                    return stilde, overwhite
+
                 overwhite2 = overwhite[self.reduced_pad:len(overwhite)-self.reduced_pad]
                 taper_window = self.trim_padding / 2.0 / overwhite.sample_rate
                 gate_params = [(overwhite2.start_time, 0., taper_window),
@@ -1631,7 +1635,10 @@ class StrainBuffer(pycbc.frame.DataBuffer):
             self.segments[delta_f] = fseries_trimmed
 
         stilde = self.segments[delta_f]
-        return stilde
+        if return_ts:
+            return stilde, overwhite
+        else:
+            return stilde
 
     def near_hwinj(self):
         """Check that the current set of triggers could be influenced by
