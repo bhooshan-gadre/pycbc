@@ -1245,6 +1245,78 @@ class StrainSegments(object):
             required_opts_multi_ifo(opt, parser, ifo, cls.required_opts_list)
 
 
+class OverwhitenedStrain:
+    def __init__(self, ifo, rank,
+                 overwhitened_strain,
+                 psd,
+                 start_time=None,  ## Needed for process batch
+                 sample_rate=4096,  ## Needed for process batch
+                 trim_padding=0.25,  ## Needed for process batch
+                 blocksize=8,  ## Needed for process batch
+                 low_frequency_cutoff=20.,
+                 high_frequency_cutoff=None,
+                 psd_inv_trunc_length=3.5,
+                 reduced_pad=0,
+                 gating_params=None,  ## Need to make auto-gating
+                 status=False,
+                 psd_status=False):
+        self.ifo = ifo
+        self.rank = rank
+        self.sample_rate = sample_rate
+        self.low_frequency_cutoff = low_frequency_cutoff
+        self.high_frequency_cutoff = sample_rate/2. if high_frequency_cutoff is None else high_frequency_cutoff
+        self.start_time = start_time
+        self.blocksize = blocksize
+        self.trim_padding = trim_padding
+        self.reduced_pad = reduced_pad
+        self.strain = overwhitened_strain
+        self.psd = psd
+        self.psds = {}
+        self.segments = {}
+        self.status = False
+
+    def overwhitened_data(self, delta_f):
+        if delta_f not in self.segments:
+            buffer_length = int(1.0 / delta_f)
+            e = len(self.strain)
+            s = int(e - buffer_length * self.sample_rate - self.reduced_pad * 2)
+            fseries = make_frequency_series(self.strain[s:e])
+
+            # we haven't calculated a resample psd for this delta_f
+            if delta_f not in self.psds:
+                psd = pycbc.psd.interpolate(self.psd, delta_f)
+                psd = pycbc.psd.inverse_spectrum_truncation(psd,
+                                       int(self.sample_rate * self.psd_inverse_length),
+                                       low_frequency_cutoff=self.low_frequency_cutoff)
+
+                self.psds[delta_f] = psd
+
+            psd = self.psds[delta_f]
+
+            # trim ends of strain
+            if self.reduced_pad  != 0:
+                overwhite = TimeSeries(zeros(e-s, dtype=self.strain.dtype),
+                                             delta_t=self.strain.delta_t)
+                pycbc.fft.ifft(fseries, overwhite)
+                overwhite2 = overwhite[self.reduced_pad:len(overwhite)-self.reduced_pad]
+                taper_window = self.trim_padding / 2.0 / overwhite.sample_rate
+                gate_params = [(overwhite2.start_time, 0., taper_window),
+                               (overwhite2.end_time, 0., taper_window)]
+                gate_data(overwhite2, gate_params)
+                fseries_trimmed = FrequencySeries(zeros(len(overwhite2) // 2 + 1,
+                                                  dtype=fseries.dtype), delta_f=delta_f)
+                pycbc.fft.fft(overwhite2, fseries_trimmed)
+                fseries_trimmed.start_time = fseries.start_time + self.reduced_pad * self.strain.delta_t
+            else:
+                fseries_trimmed = fseries
+
+            fseries_trimmed.psd = psd
+            self.segments[delta_f] = fseries_trimmed
+
+        stilde = self.segments[delta_f]
+        return stilde
+
+
 class StrainBuffer(pycbc.frame.DataBuffer):
     def __init__(self, frame_src, channel_name, start_time,
                  max_buffer=512,

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/opt/anaconda3/envs/pycbc_live_dev/bin/python
 
 """Detect compact-binary-merger gravitational-wave signals in low latency. This
 program takes a fixed template bank and performs matched filtering on a
@@ -22,7 +22,7 @@ from pycbc import fft, version, waveform, scheme, makedir
 from pycbc.types import MultiDetOptionAction, MultiDetMultiColonOptionAction
 from pycbc.filter import LiveBatchMatchedFilter, compute_followup_snr_series
 from pycbc.filter import followup_event_significance
-from pycbc.strain import StranBuffer
+from pycbc.strain import StrainBuffer, OverwhitenedStrain
 from pycbc.events.ranking import newsnr
 from pycbc.events.coinc import LiveCoincTimeslideBackgroundEstimator as Coincer
 from pycbc.events.single import LiveSingle
@@ -661,6 +661,8 @@ log_format = '%(asctime)s {} {} %(message)s'.format(platform.node(),
                                                     mpi.COMM_WORLD.Get_rank())
 pycbc.init_logging(args.verbose, format=log_format)
 
+print('params', args)
+
 ctx = scheme.from_cli(args)
 fft.from_cli(args)
 
@@ -755,8 +757,20 @@ with ctx:
     if args.max_length is not None:
         maxlen = args.max_length
     maxlen = int(maxlen)
+    # print('ifo, maxlen', ifo, maxlen)
+    # print('args')
+    # print(args)
+    # import os; os.exit()
     data_reader = {ifo: StrainBuffer.from_cli(ifo, args, maxlen)
                    for ifo in ifos}
+
+    strain_len = int(maxlen * args.sample_rate)
+	strain0 = TimeSeries(zeros(strain_len), delta_t=1.0/args.sample_rate, epoch=args.start_time-args.max_length, dtype=numpy.float32)
+	psd_len = int(args.psd_segment_length * args.sample_rate // 2 + 1)
+	psd0 = FrequencySeries(zeros(psd_len), delta_f=1./args.psd_segment_length, dtype=numpy.complex64)
+    data_to_filter = {ifo: OverwhitenedStrain(ifo, evnt.rank, strain0, psd0,
+        start_time=args.start_time, sample_rate=args.sample_rate,
+        trim_padding=args.trim_padding, blocksize=args.blocksize) for ifo in ifos}
 
     # create single-detector background "estimators"
     if args.enable_single_detector_background and evnt.rank == 0:
@@ -813,27 +827,35 @@ with ctx:
 
         for ifo in ifos:
             results[ifo] = False
-
-            if evnt.rank == 0:
-                status = data_reader[ifo].advance(valid_pad, timeout=args.frame_read_timeout)
-
-                if status is True:
-                    status = data_reader[ifo].recalculate_psd()
-
-                if data_reader[ifo].psd is not None:
-                    dist = data_reader[ifo].psd.dist
-                    if dist < args.min_psd_abort_distance or dist > args.max_psd_abort_distance:
-                        logging.info("%s PSD dist %s outside acceptable range [%s, %s]",
-                                    ifo, dist, args.min_psd_abort_distance,
-                                    args.max_psd_abort_distance)
-                        status = False
+            status = data_reader[ifo].advance(valid_pad, timeout=args.frame_read_timeout)
 
             if status is True:
-                data_reader[ifo] = evnt.comm.bcast(data_reader[ifo])
+                status = data_reader[ifo].recalculate_psd()
+
+            if data_reader[ifo].psd is not None:
+                dist = data_reader[ifo].psd.dist
+                if dist < args.min_psd_abort_distance or dist > args.max_psd_abort_distance:
+                    logging.info("%s PSD dist %s outside acceptable range [%s, %s]",
+                                 ifo, dist, args.min_psd_abort_distance,
+                                 args.max_psd_abort_distance)
+                    status = False
+
+            if status is True:
                 evnt.live_detectors.add(ifo)
+
+                if evnt.rank == 0:
+                    df_extreme = 2. / data_reader[ifo].strain.duration
+					stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
+                    data_to_filter[ifo] = OverwhitenedStrain(ifo, rank, ov_data, data_reader[ifo].psd, start_time=args.start_time, sample_rate=args.sample_rate, trim_padding=args.trim_padding, blocksize=args.blocksize)
+
+				evnt.comm.Bcast([data_to_filter[ifo].strain.data, MPI.DOUBLE],root=0)
+				evnt.comm.Bcast([data_to_filter[ifo].strain.start_time, MPI.DOUBLE],root=0)
+				evnt.comm.Bcast([data_to_filter[ifo].psd.data, MPI.DOUBLE],root=0)
+
+
                 if evnt.rank > 0:
                     logging.info('Filtering %s', ifo)
-                    results[ifo] = mf.process_data(data_reader[ifo])
+                    results[ifo] = mf.process_data(data_to_filter[ifo])
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 

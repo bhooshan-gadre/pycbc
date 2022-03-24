@@ -108,12 +108,13 @@ rm -rf ./output
 
 echo -e "\\n\\n>> [`date`] Running PyCBC Live"
 # -x PYTHONPATH -x LD_LIBRARY_PATH -x OMP_NUM_THREADS -x VIRTUAL_ENV -x PATH -x HDF5_USE_FILE_LOCKING \
+# python -m mpi4py `which pycbc_live` \
 
 mpirun \
 -host localhost,localhost \
 -n 2 \
 \
-python -m mpi4py `which pycbc_live` \
+python `which pycbc_live` \
 --bank-file template_bank.hdf \
 --sample-rate 2048 \
 --enable-bank-start-frequency \
