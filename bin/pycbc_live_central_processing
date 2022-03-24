@@ -19,7 +19,7 @@ from shutil import which
 from mpi4py import MPI as mpi
 from pycbc.pool import BroadcastPool
 from pycbc import fft, version, waveform, scheme, makedir
-from pycbc.types import MultiDetOptionAction, MultiDetMultiColonOptionAction
+from pycbc.types import MultiDetOptionAction, MultiDetMultiColonOptionAction, zeros, TimeSeries, FrequencySeries
 from pycbc.filter import LiveBatchMatchedFilter, compute_followup_snr_series
 from pycbc.filter import followup_event_significance
 from pycbc.strain import StrainBuffer, OverwhitenedStrain
@@ -770,7 +770,7 @@ with ctx:
 	psd0 = FrequencySeries(zeros(psd_len), delta_f=1./args.psd_segment_length, dtype=numpy.complex64)
     data_to_filter = {ifo: OverwhitenedStrain(ifo, evnt.rank, strain0, psd0,
         start_time=args.start_time, sample_rate=args.sample_rate,
-        trim_padding=args.trim_padding, blocksize=args.blocksize) for ifo in ifos}
+        trim_padding=args.trim_padding, blocksize=valid_pad) for ifo in ifos}
 
     # create single-detector background "estimators"
     if args.enable_single_detector_background and evnt.rank == 0:

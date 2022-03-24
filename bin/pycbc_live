@@ -22,7 +22,7 @@ from pycbc import fft, version, waveform, scheme, makedir
 from pycbc.types import MultiDetOptionAction, MultiDetMultiColonOptionAction
 from pycbc.filter import LiveBatchMatchedFilter, compute_followup_snr_series
 from pycbc.filter import followup_event_significance
-from pycbc.strain import StranBuffer
+from pycbc.strain import StrainBuffer
 from pycbc.events.ranking import newsnr
 from pycbc.events.coinc import LiveCoincTimeslideBackgroundEstimator as Coincer
 from pycbc.events.single import LiveSingle
