@@ -1271,8 +1271,8 @@ class OverwhitenedStrain:
         self.reduced_pad = reduced_pad
         self.strain = overwhitened_strain
         self.psd = psd
-        self.psd_real = self.psd.data.real
-        self.psd_imag = self.psd.data.real
+        self.psd_real = zeros(len(self.psd.data), numpy.float32)
+        self.psd_real = zeros(len(self.psd.data), numpy.float32)
         self.psds = {}
         self.segments = {}
         self.status = False
