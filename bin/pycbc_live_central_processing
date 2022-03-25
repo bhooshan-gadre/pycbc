@@ -847,13 +847,19 @@ with ctx:
                     df_extreme = 2. / data_reader[ifo].strain.duration
                     stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
                     data_to_filter[ifo] = OverwhitenedStrain(ifo, rank, ov_data, data_reader[ifo].psd, start_time=args.start_time, sample_rate=args.sample_rate, trim_padding=args.trim_padding, blocksize=args.blocksize)
+                    _start_time = ov_data.start_time
 
+                logging.info('setting data across processes')
                 evnt.comm.Bcast([data_to_filter[ifo].strain.data, MPI.DOUBLE],root=0)
-                evnt.comm.Bcast([data_to_filter[ifo].strain.start_time, MPI.DOUBLE],root=0)
-                evnt.comm.Bcast([data_to_filter[ifo].psd.data, MPI.DOUBLE],root=0)
+                evnt.comm.Bcast([_start_time, MPI.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].psd_real, MPI.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].psd_imag, MPI.DOUBLE],root=0)
 
 
                 if evnt.rank > 0:
+                    logging.info('setting psds and filter data')
+                    data_to_filter[ifo].strain.start_time = _start_time
+                    data_to_filter[ifo].set_psd()
                     logging.info('Filtering %s', ifo)
                     results[ifo] = mf.process_data(data_to_filter[ifo])
             else:

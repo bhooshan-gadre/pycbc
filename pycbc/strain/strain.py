@@ -1271,9 +1271,14 @@ class OverwhitenedStrain:
         self.reduced_pad = reduced_pad
         self.strain = overwhitened_strain
         self.psd = psd
+        self.psd_real = self.psd.data.real
+        self.psd_imag = self.psd.data.real
         self.psds = {}
         self.segments = {}
         self.status = False
+
+    def set_psd(self):
+        self.psd.data = self.psd_real + 1.0j*self.psd_imag
 
     def overwhitened_data(self, delta_f):
         if delta_f not in self.segments:
