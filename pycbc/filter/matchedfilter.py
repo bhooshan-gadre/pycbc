@@ -1690,6 +1690,7 @@ class LiveBatchMatchedFilter(object):
         psize = self.chunk_tsamples[self.block_id]
         mid = self.mids[self.block_id]
         stilde = self.data.overwhitened_data(tgroup[0].delta_f)
+        logging.info("stilde start and end times = {}, {}".format(stilde.start_time, stilde.end_time))
         psd = stilde.psd
 
         valid_end = int(psize - self.data.trim_padding)
@@ -1920,6 +1921,8 @@ def compute_followup_snr_series(data_reader, htilde, trig_time,
             if not data_reader.dq.is_extent_valid(dq_start_time, dq_duration):
                 return None
 
+    assert trig_time < data_reader.start_time, "trig_time is before the data start time"
+    assert trig_time > data_reader.end_time, "trig_time is after the data end time"
     stilde = data_reader.overwhitened_data(htilde.delta_f)
     snr, _, norm = matched_filter_core(htilde, stilde,
                                           h_norm=htilde.sigmasq(stilde.psd))
@@ -1933,13 +1936,21 @@ def compute_followup_snr_series(data_reader, htilde, trig_time,
     valid_end += half_dur_samples
     if valid_start < 0 or valid_end > len(snr)-1:
         raise ValueError(('Requested SNR duration ({0} s)'
-                          ' too long').format(duration))
+                          ' too long as valid_start and end are {1} and {2},'
+                          'data_reader strain end, start_time and duration {3}, {4}, {5} and SNR properties are {6}, {7}, {8} and trigger time is {9}').format(duration, valid_start, valid_end,
+                              data_reader.strain.start_time, data_reader.strain.end_time, data_reader.strain.duration, snr.start_time, snr.end_time, snr.duration, trig_time))
 
     # Onsource slice for Bayestar followup
     onsource_idx = float(trig_time - snr.start_time) * snr.sample_rate
     onsource_idx = int(round(onsource_idx))
     onsource_slice = slice(onsource_idx - half_dur_samples,
                            onsource_idx + half_dur_samples + 1)
+    logging.info("onsource_slice = {}".format(onsource_slice))
+    logging.info("snr len = {}".format(len(snr)))
+    logging.info('Requested SNR duration ({0} s)'
+                        ' too long as valid_start and end are {1} and {2},'
+                        'data_reader strain end, start_time and duration {3}, {4}, {5} and SNR properties are {6}, {7}, {8} and trigger time is {9}'.format(duration, valid_start, valid_end,
+                            data_reader.strain.start_time, data_reader.strain.end_time, data_reader.strain.duration, snr.start_time, snr.end_time, snr.duration, trig_time))
     return snr[onsource_slice] * norm
 
 __all__ = ['match', 'matched_filter', 'sigmasq', 'sigma', 'get_cutoff_indices',

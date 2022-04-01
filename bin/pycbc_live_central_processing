@@ -10,7 +10,7 @@ launched with mpirun.
 See https://arxiv.org/abs/1805.11174 for an overview."""
 
 import sys
-import argparse, numpy, pycbc, logging, cProfile, h5py, lal, json
+import argparse, numpy, pycbc, logging, cProfile, h5py, lal, json, copy
 import os.path
 import itertools
 import platform
@@ -761,8 +761,10 @@ with ctx:
     # print('args')
     # print(args)
     # import os; os.exit()
-    data_reader = {ifo: StrainBuffer.from_cli(ifo, args, maxlen)
-                   for ifo in ifos}
+
+    if evnt.rank == 0:
+        data_reader = {ifo: StrainBuffer.from_cli(ifo, args, maxlen)
+                    for ifo in ifos}
 
     strain_len = int(maxlen * args.sample_rate)
     strain0 = TimeSeries(zeros(strain_len), delta_t=1.0/args.sample_rate, epoch=args.start_time-args.max_length, dtype=numpy.float32)
@@ -816,57 +818,89 @@ with ctx:
         pr.enable()
 
     # main analysis loop
-    data_end = lambda: data_reader[tuple(data_reader.keys())[0]].end_time
-    last_bg_dump_time = int(data_end())
-    while data_end() < args.end_time:
+    _stop_all = True
+    last_bg_dump_time = None
+    _data_end = None
+    if evnt.rank == 0:
+        data_end = lambda: data_reader[tuple(data_reader.keys())[0]].end_time
+        last_bg_dump_time = int(data_end())
+        _data_end = int(data_end())
+        _stop_all = data_end() < args.end_time
+
+    last_bg_dump_time = evnt.comm.bcast(last_bg_dump_time, root=0)
+    _stop_all = evnt.comm.bcast(_stop_all, root=0)
+    while _stop_all:
         t1 = pycbc.gps_now()
-        logging.info('Analyzing from %s', data_end())
+        logging.info('Analyzing from %s', last_bg_dump_time)
 
         results = {}
         evnt.live_detectors = set()
 
         for ifo in ifos:
             results[ifo] = False
-            status = data_reader[ifo].advance(valid_pad, timeout=args.frame_read_timeout)
+            status = None
+            if evnt.rank == 0:
+                status = data_reader[ifo].advance(valid_pad, timeout=args.frame_read_timeout)
 
-            if status is True:
-                status = data_reader[ifo].recalculate_psd()
+                if status is True:
+                    status = data_reader[ifo].recalculate_psd()
 
-            if data_reader[ifo].psd is not None:
-                dist = data_reader[ifo].psd.dist
-                if dist < args.min_psd_abort_distance or dist > args.max_psd_abort_distance:
-                    logging.info("%s PSD dist %s outside acceptable range [%s, %s]",
-                                 ifo, dist, args.min_psd_abort_distance,
-                                 args.max_psd_abort_distance)
-                    status = False
+                if data_reader[ifo].psd is not None:
+                    dist = data_reader[ifo].psd.dist
+                    if dist < args.min_psd_abort_distance or dist > args.max_psd_abort_distance:
+                        logging.info("%s PSD dist %s outside acceptable range [%s, %s]",
+                                    ifo, dist, args.min_psd_abort_distance,
+                                    args.max_psd_abort_distance)
+                        status = False
+
+            status = evnt.comm.bcast(status, root=0)
 
             if status is True:
                 evnt.live_detectors.add(ifo)
 
                 if evnt.rank == 0:
+                    # data_reader0 = copy.deepcopy(data_reader[ifo])
+                    logging.info("PRECHECK: data reader condition for ifo {}".format(ifo))
+                    logging.info("PERCHECK: start ,end and strain start, end: {} {} {} {}".format(
+                            data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
+
                     df_extreme = 2. / data_reader[ifo].strain.duration
                     stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
                     data_to_filter[ifo] = OverwhitenedStrain(ifo, evnt.rank, ov_data, data_reader[ifo].psd, start_time=args.start_time, sample_rate=args.sample_rate, trim_padding=args.trim_padding, blocksize=valid_pad)
                     _start_time = float(ov_data.start_time)
+                    logging.info("POSTCHECK: data reader condition for ifo {}".format(ifo))
+                    logging.info("POSTCHECK: start ,end and strain start, end: {} {} {} {}".format(
+                            data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
 
                 logging.info('setting data across processes')
-                evnt.comm.Bcast([data_to_filter[ifo].strain.data, mpi.DOUBLE],root=0)
-                evnt.comm.Bcast([_start_time, mpi.DOUBLE],root=0)
-                evnt.comm.Bcast([data_to_filter[ifo].psd_real, mpi.DOUBLE],root=0)
-                evnt.comm.Bcast([data_to_filter[ifo].psd_imag, mpi.DOUBLE],root=0)
+                # evnt.comm.Bcast([data_to_filter[ifo].strain.data, mpi.DOUBLE],root=0)
+                # evnt.comm.Bcast([data_to_filter[ifo].psd_real.data, mpi.DOUBLE],root=0)
+                # evnt.comm.Bcast([data_to_filter[ifo].psd_imag.data, mpi.DOUBLE],root=0)
+                data_to_filter[ifo] = evnt.comm.bcast(data_to_filter[ifo], root=0)
+                # _start_time = evnt.comm.bcast(float(ov_data.start_time),root=0)
+                logging.info('setting data across processes ... Done!')
 
 
                 if evnt.rank > 0:
-                    logging.info('setting psds and filter data')
-                    data_to_filter[ifo].strain.start_time = _start_time
-                    data_to_filter[ifo].set_psd()
+                    # logging.info('setting psds and filter data')
+                    # data_to_filter[ifo].strain.start_time = _start_time
+                    # data_to_filter[ifo].set_psd()
                     logging.info('Filtering %s', ifo)
                     results[ifo] = mf.process_data(data_to_filter[ifo])
+
+                    logging.info("POST FILTER: strain start and end times {} and {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time))
+                # else:
+                    # stilde = data_to_filter[ifo].overwhitened_data(df_extreme)
+                    # logging.info("NON-filter stilde start -end {}, {}".format(stilde.start_time, stilde.end_time))
+                    # logging.info("POST FILTER: strain start and end times {} and {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time))
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 
+
+        if evnt.rank == 0: _data_end = int(data_end())
+        _data_end = evnt.comm.bcast(_data_end, root=0)
         if evnt.rank > 0:
-            evnt.commit_results((results, data_end()))
+            evnt.commit_results((results, _data_end))
         else:
             psds = {ifo: data_reader[ifo].psd for ifo in data_reader if data_reader[ifo].psd is not None}
 
@@ -904,14 +938,18 @@ with ctx:
                 # Pick the best coinc in this chunk
                 best_coinc = Coincer.pick_best_coinc(coinc_results)
 
+                # evnt.barrier()
+                assert _data_end == int(data_end()), "Both data ends do not match. they are {} and {}".format(_data_end, data_end())
                 evnt.check_coincs(list(results.keys()), best_coinc,
                                   psds, args.low_frequency_cutoff,
                                   data_reader, bank)
+                                  # data_to_filter, bank)
 
             # Check for singles
             if args.enable_single_detector_background:
                 evnt.check_singles(results, data_reader, psds,
                                    args.low_frequency_cutoff)
+                # evnt.check_singles(results, data_to_filter, psds,
 
             gates = {ifo: data_reader[ifo].gate_params for ifo in data_reader}
 
@@ -949,10 +987,16 @@ with ctx:
 
             logging.info('Finished Analyzing up to %s', data_end())
 
+        if evnt.rank == 0:
+            _stop_all = data_end() < args.end_time
+            _data_end = int(data_end())
+        _data_end = evnt.comm.bcast(_data_end, root=0)
         if args.sync:
             evnt.barrier()
+        # evnt.barrier()
+        _stop_all = evnt.comm.bcast(_stop_all, root=0)
         tdiff = pycbc.gps_now() - t1
-        lag = float(pycbc.gps_now() - data_end())
+        lag = float(pycbc.gps_now() - _data_end)
         logging.info('Took %1.2f, duty factor of %.2f, '
                      'lag %.2f s, %d live detectors',
                      tdiff, tdiff / valid_pad, lag,

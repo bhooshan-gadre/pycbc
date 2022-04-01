@@ -1270,15 +1270,28 @@ class OverwhitenedStrain:
         self.trim_padding = trim_padding
         self.reduced_pad = reduced_pad
         self.strain = overwhitened_strain
+        self.psd_inverse_length = psd_inv_trunc_length
         self.psd = psd
         self.psd_real = zeros(len(self.psd.data), numpy.float32)
         self.psd_real = zeros(len(self.psd.data), numpy.float32)
         self.psds = {}
         self.segments = {}
         self.status = False
+        self.state = False
 
     def set_psd(self):
         self.psd.data = self.psd_real + 1.0j*self.psd_imag
+
+    def near_hwinj(self):
+        """Check that the current set of triggers could be influenced by
+        a hardware injection.
+        """
+        if not self.state:
+            return False
+
+        if not self.state.is_extent_valid(self.start_time, self.blocksize, pycbc.frame.NO_HWINJ):
+            return True
+        return False
 
     def overwhitened_data(self, delta_f):
         if delta_f not in self.segments:
@@ -1640,6 +1653,7 @@ class StrainBuffer(pycbc.frame.DataBuffer):
             self.segments[delta_f] = fseries_trimmed
 
         stilde = self.segments[delta_f]
+        logging.info("stilde start and end times = {}, {}".format(stilde.start_time, stilde.end_time))
         if return_ts:
             return stilde, overwhite
         else:

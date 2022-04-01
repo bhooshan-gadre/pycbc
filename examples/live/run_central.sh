@@ -272,7 +272,7 @@ python -m mpi4py /Users/bug/work/pycbc_online_O4/pycbc/bin/pycbc_live_central_pr
 --src-class-mchirp-to-delta 0.01 \
 --src-class-eff-to-lum-distance 0.74899 \
 --src-class-lum-distance-to-delta -0.51557 -0.32195 \
---verbose
+--verbose --sync
 
 echo -e "\\n\\n>> [`date`] Checking results"
 ./check_results.py \
