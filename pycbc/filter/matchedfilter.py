@@ -1921,8 +1921,8 @@ def compute_followup_snr_series(data_reader, htilde, trig_time,
             if not data_reader.dq.is_extent_valid(dq_start_time, dq_duration):
                 return None
 
-    assert trig_time < data_reader.start_time, "trig_time is before the data start time"
-    assert trig_time > data_reader.end_time, "trig_time is after the data end time"
+    # assert trig_time < data_reader.start_time, "trig_time is before the data start time"
+    # assert trig_time > data_reader.end_time, "trig_time is after the data end time"
     stilde = data_reader.overwhitened_data(htilde.delta_f)
     snr, _, norm = matched_filter_core(htilde, stilde,
                                           h_norm=htilde.sigmasq(stilde.psd))

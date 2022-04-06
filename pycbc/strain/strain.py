@@ -1272,15 +1272,26 @@ class OverwhitenedStrain:
         self.strain = overwhitened_strain
         self.psd_inverse_length = psd_inv_trunc_length
         self.psd = psd
-        self.psd_real = zeros(len(self.psd.data), numpy.float32)
-        self.psd_imag = zeros(len(self.psd.data), numpy.float32)
+        self.psd_real = TimeSeries(zeros(len(self.psd), numpy.float32), delta_t=1)
+        self.psd_imag = TimeSeries(zeros(len(self.psd), numpy.float32), delta_t=1)
         self.psds = {}
         self.segments = {}
         self.status = False
         self.state = False
+        self.total_corruption = 0
 
     def set_psd(self):
         self.psd.data = self.psd_real.data + 1.0j*self.psd_imag.data
+
+    @property
+    def end_time(self):
+        """ Return the end time of the current valid segment of data """
+        return float(self.strain.start_time + (len(self.strain) - self.total_corruption) / self.sample_rate)
+
+    @property
+    def start_time(self):
+        """ Return the start time of the current valid segment of data """
+        return self.end_time - self.blocksize
 
     def near_hwinj(self):
         """Check that the current set of triggers could be influenced by

@@ -867,38 +867,45 @@ with ctx:
                     df_extreme = 2. / data_reader[ifo].strain.duration
                     stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
                     data_to_filter[ifo] = OverwhitenedStrain(ifo, evnt.rank, ov_data, data_reader[ifo].psd, start_time=args.start_time, sample_rate=args.sample_rate, trim_padding=args.trim_padding, blocksize=valid_pad)
-                    _start_time = float(ov_data.start_time)
+                    data_to_filter[ifo].blocksize = data_reader[ifo].blocksize
+                    data_to_filter[ifo].start_time = data_reader[ifo].start_time
+                    data_to_filter[ifo].total_corruption = data_reader[ifo].total_corruption
+                    # _start_time = float(ov_data.start_time)
+                    # data_to_filter[ifo].strain.start_time = _start_time
                     logging.info("POSTCHECK: data reader condition for ifo {}".format(ifo))
                     logging.info("POSTCHECK: start ,end and strain start, end: {} {} {} {}".format(
                             data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
 
-                # logging.info('setting data across processes')
-                # data_to_filter[ifo] = evnt.comm.bcast(data_to_filter[ifo], root=0)
-                # logging.info('setting data across processes ... Done!')
-
                 logging.info('setting data across processes')
-                evnt.comm.Bcast([data_to_filter[ifo].strain.data, mpi.DOUBLE],root=0)
-                evnt.comm.Bcast([data_to_filter[ifo].psd_real.data, mpi.DOUBLE],root=0)
-                evnt.comm.Bcast([data_to_filter[ifo].psd_imag.data, mpi.DOUBLE],root=0)
-                # _start_time = evnt.comm.bcast(float(ov_data.start_time),root=0)
+                data_to_filter[ifo] = evnt.comm.bcast(data_to_filter[ifo], root=0)
                 logging.info('setting data across processes ... Done!')
-                logging.info('setting psd post data setup')
-                data_to_filter[ifo].set_psd()
-                logging.info('setting psd post data setup .. Done!')
+
+                # logging.info('setting data across processes for ifo {}'.format(ifo))
+                # logging.info("sending strain {}".format(ifo))
+                # data_to_filter[ifo].strain = evnt.comm.bcast(data_to_filter[ifo].strain, root=0)
+                # logging.info("sending psd {}".format(ifo))
+                # data_to_filter[ifo].psd = evnt.comm.bcast(data_to_filter[ifo].psd, root=0)
+                # evnt.comm.Bcast([data_to_filter[ifo].strain.data, mpi.FLOAT],root=0)
+                # data_to_filter[ifo].psd = evnt.comm.bcast(data_to_filter[ifo].psd, root=0)
+                # logging.info("sending psd real {}".format(ifo))
+                # evnt.comm.Bcast([data_to_filter[ifo].psd_real.data, mpi.FLOAT],root=0)
+                # logging.info("sending psd imag {}".format(ifo))
+                # evnt.comm.Bcast([data_to_filter[ifo].psd_imag.data, mpi.FLOAT],root=0)
+                # logging.info("sending start_time {}".format(ifo))
+                # data_to_filter[ifo].start_time = evnt.comm.bcast(data_to_filter[ifo].start_time, root=0)
+                # _start_time = evnt.comm.bcast(float(ov_data.start_time),root=0)
+                # logging.info('setting data across processes ... Done! {}'.format(ifo))
 
 
                 if evnt.rank > 0:
                     # logging.info('setting psds and filter data')
-                    # data_to_filter[ifo].strain.start_time = _start_time
+                    # logging.info('setting psd post data setup {}'.format(ifo))
                     # data_to_filter[ifo].set_psd()
+                    # logging.info('setting psd post data setup .. Done! {}'.format(ifo))
                     logging.info('Filtering %s', ifo)
                     results[ifo] = mf.process_data(data_to_filter[ifo])
 
-                    logging.info("POST FILTER: strain start and end times {} and {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time))
-                # else:
-                    # stilde = data_to_filter[ifo].overwhitened_data(df_extreme)
-                    # logging.info("NON-filter stilde start -end {}, {}".format(stilde.start_time, stilde.end_time))
-                    # logging.info("POST FILTER: strain start and end times {} and {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time))
+                    logging.info("POST FILTER: strain start and end times {} and {} for ifo {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time, ifo))
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 
@@ -946,16 +953,19 @@ with ctx:
 
                 # evnt.barrier()
                 assert _data_end == int(data_end()), "Both data ends do not match. they are {} and {}".format(_data_end, data_end())
+                # evnt.check_coincs(list(results.keys()), best_coinc,
+                #                   psds, args.low_frequency_cutoff,
+                #                   data_to_filter, bank)
                 evnt.check_coincs(list(results.keys()), best_coinc,
                                   psds, args.low_frequency_cutoff,
                                   data_reader, bank)
-                                  # data_to_filter, bank)
 
             # Check for singles
             if args.enable_single_detector_background:
-                evnt.check_singles(results, data_reader, psds,
+                # evnt.check_singles(results, data_reader, psds,
+                #                    args.low_frequency_cutoff)
+                evnt.check_singles(results, data_to_filter, psds,
                                    args.low_frequency_cutoff)
-                # evnt.check_singles(results, data_to_filter, psds,
 
             gates = {ifo: data_reader[ifo].gate_params for ifo in data_reader}
 
