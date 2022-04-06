@@ -872,13 +872,19 @@ with ctx:
                     logging.info("POSTCHECK: start ,end and strain start, end: {} {} {} {}".format(
                             data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
 
+                # logging.info('setting data across processes')
+                # data_to_filter[ifo] = evnt.comm.bcast(data_to_filter[ifo], root=0)
+                # logging.info('setting data across processes ... Done!')
+
                 logging.info('setting data across processes')
-                # evnt.comm.Bcast([data_to_filter[ifo].strain.data, mpi.DOUBLE],root=0)
-                # evnt.comm.Bcast([data_to_filter[ifo].psd_real.data, mpi.DOUBLE],root=0)
-                # evnt.comm.Bcast([data_to_filter[ifo].psd_imag.data, mpi.DOUBLE],root=0)
-                data_to_filter[ifo] = evnt.comm.bcast(data_to_filter[ifo], root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].strain.data, mpi.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].psd_real.data, mpi.DOUBLE],root=0)
+                evnt.comm.Bcast([data_to_filter[ifo].psd_imag.data, mpi.DOUBLE],root=0)
                 # _start_time = evnt.comm.bcast(float(ov_data.start_time),root=0)
                 logging.info('setting data across processes ... Done!')
+                logging.info('setting psd post data setup')
+                data_to_filter[ifo].set_psd()
+                logging.info('setting psd post data setup .. Done!')
 
 
                 if evnt.rank > 0:

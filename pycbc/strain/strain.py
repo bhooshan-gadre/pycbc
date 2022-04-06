@@ -1273,14 +1273,14 @@ class OverwhitenedStrain:
         self.psd_inverse_length = psd_inv_trunc_length
         self.psd = psd
         self.psd_real = zeros(len(self.psd.data), numpy.float32)
-        self.psd_real = zeros(len(self.psd.data), numpy.float32)
+        self.psd_imag = zeros(len(self.psd.data), numpy.float32)
         self.psds = {}
         self.segments = {}
         self.status = False
         self.state = False
 
     def set_psd(self):
-        self.psd.data = self.psd_real + 1.0j*self.psd_imag
+        self.psd.data = self.psd_real.data + 1.0j*self.psd_imag.data
 
     def near_hwinj(self):
         """Check that the current set of triggers could be influenced by
