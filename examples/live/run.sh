@@ -102,11 +102,11 @@ else
 fi
 
 
-# delete old outputs if they exist
-rm -rf ./output
 
 
 echo -e "\\n\\n>> [`date`] Running PyCBC Live"
+# delete old outputs if they exist
+rm -rf ./output
 # -x PYTHONPATH -x LD_LIBRARY_PATH -x OMP_NUM_THREADS -x VIRTUAL_ENV -x PATH -x HDF5_USE_FILE_LOCKING \
 # python -m mpi4py `which pycbc_live` \
 
@@ -114,97 +114,7 @@ mpirun \
 -host localhost,localhost \
 -n 2 \
 \
-python `which pycbc_live` \
---bank-file template_bank.hdf \
---sample-rate 2048 \
---enable-bank-start-frequency \
---low-frequency-cutoff ${f_min} \
---max-length 256 \
---approximant "SPAtmplt:mtotal<4" "IMRPhenomD:else" \
---chisq-bins "0.72*get_freq('fSEOBNRv4Peak',params.mass1,params.mass2,params.spin1z,params.spin2z)**0.7" \
---snr-abort-threshold 500 \
---snr-threshold 4.5 \
---newsnr-threshold 4.5 \
---max-triggers-in-batch 30 \
---store-loudest-index 50 \
---analysis-chunk 8 \
---autogating-threshold 50 \
---autogating-pad 0.5 \
---autogating-cluster 1 \
---autogating-width 0.25 \
---autogating-taper 0.25 \
---highpass-frequency 13 \
---highpass-bandwidth 5 \
---highpass-reduction 200 \
---psd-samples 30 \
---max-psd-abort-distance 600 \
---min-psd-abort-distance 20 \
---psd-abort-difference .15 \
---psd-recalculate-difference .01 \
---psd-inverse-length 3.5 \
---psd-segment-length 4 \
---trim-padding .5 \
---store-psd \
---increment-update-cache \
-    H1:strain/H1 \
-    L1:strain/L1 \
-    V1:strain/V1 \
---frame-src \
-    H1:strain/H1/* \
-    L1:strain/L1/* \
-    V1:strain/V1/* \
---frame-read-timeout 100 \
---channel-name \
-    H1:SIMULATED_STRAIN \
-    L1:SIMULATED_STRAIN \
-    V1:SIMULATED_STRAIN \
---processing-scheme cpu:4 \
---fftw-measure-level 0 \
---fftw-threads-backend openmp \
---increment 8 \
---max-batch-size 16777216 \
---output-path output \
---day-hour-output-prefix \
---sngl-ranking newsnr_sgveto \
---ranking-statistic phasetd \
---statistic-files statHL.hdf statHV.hdf statLV.hdf \
---sgchisq-snr-threshold 4 \
---sgchisq-locations "mtotal>40:20-30,20-45,20-60,20-75,20-90,20-105,20-120" \
---enable-background-estimation \
---background-ifar-limit 100 \
---timeslide-interval 0.1 \
---pvalue-combination-livetime 0.0005 \
---ifar-double-followup-threshold 0.0001 \
---ifar-upload-threshold 0.0001 \
---round-start-time 4 \
---start-time $gps_start_time \
---end-time $gps_end_time \
---src-class-mchirp-to-delta 0.01 \
---src-class-eff-to-lum-distance 0.74899 \
---src-class-lum-distance-to-delta -0.51557 -0.32195 \
---verbose
-
-echo -e "\\n\\n>> [`date`] Checking results"
-./check_results.py \
-    --gps-start ${gps_start_time} \
-    --gps-end ${gps_end_time} \
-    --f-min ${f_min} \
-    --bank template_bank.hdf \
-    --injections injections.hdf \
-    --detectors H1 L1 V1
-
-echo -e "\\n\\n>> [`date`] Running Bayestar"
-for XMLFIL in `ls output/*xml*`
-do
-    bayestar-localize-coincs --f-low ${f_min} ${XMLFIL} ${XMLFIL}
-done
-
-echo -e "\\n\\n [`date`] Running central processing version"
-mpirun \
--host localhost,localhost \
--n 2 \
-\
-python -m mpi4py /Users/bug/work/pycbc_online_O4/pycbc/bin/pycbc_live_central_processing \
+python -m mpi4py `which pycbc_live` \
 --bank-file template_bank.hdf \
 --sample-rate 2048 \
 --enable-bank-start-frequency \

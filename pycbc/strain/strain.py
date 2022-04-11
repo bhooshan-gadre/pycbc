@@ -1267,7 +1267,7 @@ class OverwhitenedStrain:
         self.high_frequency_cutoff = sample_rate/2. if high_frequency_cutoff is None else high_frequency_cutoff
         self._start_time = start_time
         self.blocksize = blocksize
-        self.trim_padding = trim_padding
+        self.trim_padding = int(trim_padding * self.sample_rate)
         self.reduced_pad = reduced_pad
         self.strain = overwhitened_strain
         self.psd_inverse_length = psd_inv_trunc_length

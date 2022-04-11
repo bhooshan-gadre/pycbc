@@ -30,7 +30,8 @@ samples['spin2z'] = [0.92713535, 0.020993788]
 
 # distance and sky locations to have network SNRs ~15
 samples['tc'] = [1272790100.1, 1272790260.1]
-samples['distance'] = [178., 79.]
+samples['distance'] = [100., 50.]
+# samples['distance'] = [178., 79.]
 samples['ra'] = [np.deg2rad(45), np.deg2rad(10)]
 samples['dec'] = [np.deg2rad(45), np.deg2rad(-45)]
 
