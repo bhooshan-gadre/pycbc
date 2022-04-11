@@ -831,6 +831,9 @@ with ctx:
                 if evnt.rank > 0:
                     logging.info('Filtering %s', ifo)
                     results[ifo] = mf.process_data(data_reader[ifo])
+
+                    logging.info("results[{}]: {}".format(ifo, results[ifo]))
+                    import sys; sys.exit()
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 

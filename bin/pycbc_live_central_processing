@@ -904,8 +904,9 @@ with ctx:
                     # logging.info('setting psd post data setup .. Done! {}'.format(ifo))
                     logging.info('Filtering %s', ifo)
                     results[ifo] = mf.process_data(data_to_filter[ifo])
-
                     logging.info("POST FILTER: strain start and end times {} and {} for ifo {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time, ifo))
+                    logging.info("results[{}]: {}".format(ifo, results[ifo]))
+                    import sys; sys.exit()
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 

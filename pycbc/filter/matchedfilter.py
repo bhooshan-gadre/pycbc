@@ -1620,6 +1620,7 @@ class LiveBatchMatchedFilter(object):
     def process_data(self, data_reader):
         """Process the data for all of the templates"""
         self.set_data(data_reader)
+        logging.info("SETTING DATA: data trim_padding, blocksize, sample_rate, start_time: {}, {}, {}, {}".format(self.data.trim_padding, self.data.blocksize, self.data.sample_rate, self.data.start_time))
         return self.process_all()
 
     def process_all(self):

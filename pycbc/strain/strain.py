@@ -1265,7 +1265,7 @@ class OverwhitenedStrain:
         self.sample_rate = sample_rate
         self.low_frequency_cutoff = low_frequency_cutoff
         self.high_frequency_cutoff = sample_rate/2. if high_frequency_cutoff is None else high_frequency_cutoff
-        self.start_time = start_time
+        self._start_time = start_time
         self.blocksize = blocksize
         self.trim_padding = trim_padding
         self.reduced_pad = reduced_pad
@@ -1292,6 +1292,10 @@ class OverwhitenedStrain:
     def start_time(self):
         """ Return the start time of the current valid segment of data """
         return self.end_time - self.blocksize
+
+    @start_time.setter
+    def start_time(self, start_time):
+        self._start_time = start_time
 
     def near_hwinj(self):
         """Check that the current set of triggers could be influenced by
