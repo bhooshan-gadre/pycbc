@@ -107,11 +107,11 @@ rm -rf ./output
 
 
 echo -e "\\n\\n>> [`date`] Running PyCBC Live"
+# -x PYTHONPATH -x LD_LIBRARY_PATH -x OMP_NUM_THREADS -x VIRTUAL_ENV -x PATH -x HDF5_USE_FILE_LOCKING \
 
 mpirun \
 -host localhost,localhost \
 -n 2 \
--x PYTHONPATH -x LD_LIBRARY_PATH -x OMP_NUM_THREADS -x VIRTUAL_ENV -x PATH -x HDF5_USE_FILE_LOCKING \
 \
 python -m mpi4py `which pycbc_live` \
 --bank-file template_bank.hdf \
@@ -119,7 +119,7 @@ python -m mpi4py `which pycbc_live` \
 --enable-bank-start-frequency \
 --low-frequency-cutoff ${f_min} \
 --max-length 256 \
---approximant "SPAtmplt:mtotal<4" "SEOBNRv4_ROM:else" \
+--approximant "SPAtmplt:mtotal<4" "IMRPhenomD:else" \
 --chisq-bins "0.72*get_freq('fSEOBNRv4Peak',params.mass1,params.mass2,params.spin1z,params.spin2z)**0.7" \
 --snr-abort-threshold 500 \
 --snr-threshold 4.5 \

@@ -20,6 +20,7 @@ from mpi4py import MPI as mpi
 from pycbc.pool import BroadcastPool
 from pycbc import fft, version, waveform, scheme, makedir
 from pycbc.types import MultiDetOptionAction, MultiDetMultiColonOptionAction
+from pycbc.types import zeros, TimeSeries, FrequencySeries
 from pycbc.filter import LiveBatchMatchedFilter, compute_followup_snr_series
 from pycbc.filter import followup_event_significance
 from pycbc.strain import StrainBuffer, OverwhitenedStrain
@@ -756,6 +757,9 @@ with ctx:
     maxlen = int(maxlen)
 
     if evnt.rank == 0:
+        data_reader = {ifo: StrainBuffer.from_cli(ifo, args, maxlen)
+                    for ifo in ifos}
+    else:
         data_reader = {ifo: StrainBuffer.from_cli(ifo, args, maxlen)
                     for ifo in ifos}
 
