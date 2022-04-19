@@ -1816,6 +1816,7 @@ def followup_event_significance(ifo, data_reader, bank,
         bdur = data_reader.strain.duration * .75
 
     # Require all strain be valid within lookback time
+    logging.info("STATE = {} and DQ = {} in followup_event_significance".format(data_reader.state, data_reader.dq))
     if data_reader.state is not None:
         state_start_time = data_reader.strain.end_time \
                 - data_reader.reduced_pad * data_reader.strain.delta_t - bdur

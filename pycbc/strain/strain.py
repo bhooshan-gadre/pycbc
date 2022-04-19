@@ -1272,16 +1272,18 @@ class OverwhitenedStrain:
         self.strain = overwhitened_strain
         self.psd_inverse_length = psd_inv_trunc_length
         self.psd = psd
-        self.psd_real = TimeSeries(zeros(len(self.psd), numpy.float32), delta_t=1)
-        self.psd_imag = TimeSeries(zeros(len(self.psd), numpy.float32), delta_t=1)
+        # self.psd_real = TimeSeries(zeros(len(self.psd), numpy.float32), delta_t=1)
+        # self.psd_imag = TimeSeries(zeros(len(self.psd), numpy.float32), delta_t=1)
         self.psds = {}
         self.segments = {}
         self.status = False
-        self.state = False
+        self.state = None
         self.total_corruption = 0
+        self.dq = None
+        self.state = None
 
-    def set_psd(self):
-        self.psd.data = self.psd_real.data + 1.0j*self.psd_imag.data
+    # def set_psd(self):
+    #     self.psd.data = self.psd_real.data + 1.0j*self.psd_imag.data
 
     @property
     def end_time(self):
@@ -1296,6 +1298,54 @@ class OverwhitenedStrain:
     @start_time.setter
     def start_time(self, start_time):
         self._start_time = start_time
+
+    # def check_valid(self, values, flag=None):
+    #     """Check if the data contains any non-valid status information
+    #
+    #     Parameters
+    #     ----------
+    #     values: pycbc.types.Array
+    #         Array of status information
+    #     flag: str, optional
+    #         Override the default valid mask with a user defined mask.
+    #
+    #     Returns
+    #     -------
+    #     status: boolean
+    #         Returns True if all of the status information if valid,
+    #          False if any is not.
+    #     """
+    #     if self.valid_on_zero:
+    #         valid = values.numpy() == 0
+    #     else:
+    #         if flag is None:
+    #             flag = self.valid_mask
+    #         valid = numpy.bitwise_and(values.numpy(), flag) == flag
+    #     return bool(numpy.all(valid))
+    #
+    # def is_extent_valid(self, start_time, duration, flag=None):
+    #     """Check if the duration contains any non-valid frames
+    #
+    #     Parameters
+    #     ----------
+    #     start_time: int
+    #         Beginning of the duration to check in gps seconds
+    #     duration: int
+    #         Number of seconds after the start_time to check
+    #     flag: str, optional
+    #         Override the default valid mask with a user defined mask.
+    #
+    #     Returns
+    #     -------
+    #     status: boolean
+    #         Returns True if all of the status information if valid,
+    #         False if any is not.
+    #     """
+    #     sr = self.raw_buffer.sample_rate
+    #     s = int((start_time - self.raw_buffer.start_time) * sr)
+    #     e = s + int(duration * sr) + 1
+    #     data = self.raw_buffer[s:e]
+    #     return self.check_valid(data, flag=flag)
 
     def near_hwinj(self):
         """Check that the current set of triggers could be influenced by
