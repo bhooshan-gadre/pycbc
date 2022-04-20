@@ -1347,6 +1347,13 @@ class OverwhitenedStrain:
     #     data = self.raw_buffer[s:e]
     #     return self.check_valid(data, flag=flag)
 
+
+    def invalidate_data(self):
+        self.psds = {}
+        self.segments = {}
+        self.strain = None
+
+
     def near_hwinj(self):
         """Check that the current set of triggers could be influenced by
         a hardware injection.
@@ -1718,7 +1725,7 @@ class StrainBuffer(pycbc.frame.DataBuffer):
             self.segments[delta_f] = fseries_trimmed
 
         stilde = self.segments[delta_f]
-        logging.info("stilde start and end times = {}, {}".format(stilde.start_time, stilde.end_time))
+        # logging.info("stilde start and end times = {}, {}".format(stilde.start_time, stilde.end_time))
         if return_ts:
             return stilde, overwhite
         else:

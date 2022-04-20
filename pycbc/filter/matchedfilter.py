@@ -1620,7 +1620,7 @@ class LiveBatchMatchedFilter(object):
     def process_data(self, data_reader):
         """Process the data for all of the templates"""
         self.set_data(data_reader)
-        logging.info("SETTING DATA: data trim_padding, blocksize, sample_rate, start_time: {}, {}, {}, {}".format(self.data.trim_padding, self.data.blocksize, self.data.sample_rate, self.data.start_time))
+        # logging.info("SETTING DATA: data trim_padding, blocksize, sample_rate, start_time: {}, {}, {}, {}".format(self.data.trim_padding, self.data.blocksize, self.data.sample_rate, self.data.start_time))
         return self.process_all()
 
     def process_all(self):
@@ -1691,7 +1691,7 @@ class LiveBatchMatchedFilter(object):
         psize = self.chunk_tsamples[self.block_id]
         mid = self.mids[self.block_id]
         stilde = self.data.overwhitened_data(tgroup[0].delta_f)
-        logging.info("stilde start and end times = {}, {}".format(stilde.start_time, stilde.end_time))
+        # logging.info("stilde start and end times = {}, {}".format(stilde.start_time, stilde.end_time))
         psd = stilde.psd
 
         valid_end = int(psize - self.data.trim_padding)
@@ -1816,7 +1816,7 @@ def followup_event_significance(ifo, data_reader, bank,
         bdur = data_reader.strain.duration * .75
 
     # Require all strain be valid within lookback time
-    logging.info("STATE = {} and DQ = {} in followup_event_significance".format(data_reader.state, data_reader.dq))
+    # logging.info("STATE = {} and DQ = {} in followup_event_significance".format(data_reader.state, data_reader.dq))
     if data_reader.state is not None:
         state_start_time = data_reader.strain.end_time \
                 - data_reader.reduced_pad * data_reader.strain.delta_t - bdur

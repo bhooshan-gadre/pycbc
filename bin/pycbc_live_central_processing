@@ -751,7 +751,7 @@ with ctx:
 
     if args.round_start_time:
         args.start_time = int(args.start_time / args.round_start_time + 1) * args.round_start_time
-        logging.info('Starting from: %s', args.start_time)
+        # logging.info('Starting from: %s', args.start_time)
 
     # initialize the data readers for all detectors
     if args.max_length is not None:
@@ -860,9 +860,9 @@ with ctx:
 
                 if evnt.rank == 0:
                     # data_reader0 = copy.deepcopy(data_reader[ifo])
-                    logging.info("PRECHECK: data reader condition for ifo {}".format(ifo))
-                    logging.info("PERCHECK: start ,end and strain start, end: {} {} {} {}".format(
-                            data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
+                    # logging.info("PRECHECK: data reader condition for ifo {}".format(ifo))
+                    # logging.info("PERCHECK: start ,end and strain start, end: {} {} {} {}".format(
+                    #         data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
 
                     df_extreme = 2. / data_reader[ifo].strain.duration
                     stilde, ov_data = data_reader[ifo].overwhitened_data(df_extreme, return_ts=True)
@@ -872,8 +872,8 @@ with ctx:
                     data_to_filter[ifo].total_corruption = data_reader[ifo].total_corruption
                     # _start_time = float(ov_data.start_time)
                     # data_to_filter[ifo].strain.start_time = _start_time
-                    logging.info("POSTCHECK: data reader condition for ifo {}".format(ifo))
-                    logging.info("POSTCHECK: start ,end and strain start, end: {} {} {} {}".format(
+                    # logging.info("POSTCHECK: data reader condition for ifo {}".format(ifo))
+                    # logging.info("POSTCHECK: start ,end and strain start, end: {} {} {} {}".format(
                             data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
 
                 logging.info('setting data across processes')
@@ -904,9 +904,7 @@ with ctx:
                     # logging.info('setting psd post data setup .. Done! {}'.format(ifo))
                     logging.info('Filtering %s', ifo)
                     results[ifo] = mf.process_data(data_to_filter[ifo])
-                    logging.info("POST FILTER: strain start and end times {} and {} for ifo {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time, ifo))
-                    logging.info("results[{}]: {}".format(ifo, results[ifo]))
-                    import sys; sys.exit()
+                    # logging.info("POST FILTER: strain start and end times {} and {} for ifo {}".format(data_to_filter[ifo].strain.start_time, data_to_filter[ifo].strain.end_time, ifo))
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 
