@@ -870,11 +870,13 @@ with ctx:
                     data_to_filter[ifo].blocksize = data_reader[ifo].blocksize
                     data_to_filter[ifo].start_time = data_reader[ifo].start_time
                     data_to_filter[ifo].total_corruption = data_reader[ifo].total_corruption
+                    data_to_filter[ifo].trim_padding = data_reader[ifo].trim_padding
+                    data_to_filter[ifo].reduced_pad = data_reader[ifo].reduced_pad
                     # _start_time = float(ov_data.start_time)
                     # data_to_filter[ifo].strain.start_time = _start_time
                     # logging.info("POSTCHECK: data reader condition for ifo {}".format(ifo))
                     # logging.info("POSTCHECK: start ,end and strain start, end: {} {} {} {}".format(
-                            data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
+                            # data_reader[ifo].start_time, data_reader[ifo].end_time, data_reader[ifo].strain.start_time, data_reader[ifo].strain.end_time))
 
                 logging.info('setting data across processes')
                 data_to_filter[ifo] = evnt.comm.bcast(data_to_filter[ifo], root=0)
