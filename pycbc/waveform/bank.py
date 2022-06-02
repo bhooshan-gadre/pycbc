@@ -654,12 +654,15 @@ class FilterBank(TemplateBank):
                  out=None, max_template_length=None,
                  approximant=None, parameters=None,
                  enable_compressed_waveforms=True,
-                 low_frequency_cutoff=None,
+                 low_frequency_cutoff=None, f_ref=None,
                  waveform_decompression_method=None,
                  **kwds):
         self.out = out
         self.dtype = dtype
         self.f_lower = low_frequency_cutoff
+        self.f_ref = f_ref if f_ref else 0.
+        ## TODO: Make the above statement work. For now, let us set f_ref to 10 Hz
+        self.f_ref = 10
         self.filename = filename
         self.delta_f = delta_f
         self.N = (filter_length - 1 ) * 2
@@ -746,7 +749,7 @@ class FilterBank(TemplateBank):
             htilde = pycbc.waveform.get_waveform_filter(
                 cached_mem, self.table[t_num], approximant=approximant,
                 f_lower=low_frequency_cutoff, f_final=max_freq, delta_f=delta_f,
-                distance=1./DYN_RANGE_FAC, delta_t=1./(2.*max_freq))
+                distance=1./DYN_RANGE_FAC, delta_t=1./(2.*max_freq), f_ref=self.f_ref)
         return htilde
 
     def __getitem__(self, index):
@@ -780,7 +783,7 @@ class FilterBank(TemplateBank):
         else :
             htilde = pycbc.waveform.get_waveform_filter(
                 tempout[0:self.filter_length], self.table[index],
-                approximant=approximant, f_lower=f_low, f_final=f_end,
+                approximant=approximant, f_lower=f_low, f_final=f_end, f_ref=self.f_ref,
                 delta_f=self.delta_f, delta_t=self.delta_t, distance=distance,
                 **self.extra_args)
 
@@ -797,6 +800,7 @@ class FilterBank(TemplateBank):
 
         htilde = htilde.astype(self.dtype)
         htilde.f_lower = f_low
+        htilde.f_ref = self.f_ref
         htilde.min_f_lower = self.min_f_lower
         htilde.end_idx = int(f_end / htilde.delta_f)
         htilde.params = self.table[index]
