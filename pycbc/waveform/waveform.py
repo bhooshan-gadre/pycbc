@@ -872,8 +872,12 @@ def get_imr_length(approx, **kwds):
     s1z = float(kwds['spin1z'])
     s2z = float(kwds['spin2z'])
     f_low = float(kwds['f_lower'])
+    f_ref = float(kwds['f_ref']) if 'f_ref' in kwds else f_low
+    eccentricity = float(kwds['eccentricity']) if 'eccentricity' in kwds else 0.
+    mean_per_ano = float(kwds['mean_per_ano']) if 'mean_per_ano' in kwds else 0.
     # 10% margin of error is incorporated in the pnutils function
-    return pnutils.get_imr_duration(m1, m2, s1z, s2z, f_low, approximant=approx)
+    return pnutils.get_imr_duration(m1, m2, s1z, s2z, f_low, approximant=approx,
+            f_ref=f_ref, eccentricity=eccentricity, mean_per_ano=mean_per_ano)
 
 def seobnrv2_length_in_time(**kwds):
     """Stub for holding the calculation of SEOBNRv2* waveform duration.
@@ -955,6 +959,8 @@ _filter_time_lengths["IMRPhenomHM"] = imrphenomhm_length_in_time
 _filter_time_lengths["IMRPhenomPv3HM"] = imrphenomhm_length_in_time
 _filter_time_lengths["IMRPhenomXHM"] = imrphenomhm_length_in_time
 _filter_time_lengths["IMRPhenomXPHM"] = imrphenomhm_length_in_time
+_filter_time_lengths["IMRPhenomXEv1"] = imrphenomhm_length_in_time
+_filter_time_lengths["IMRPhenomXE"] = imrphenomhm_length_in_time
 _filter_time_lengths["SpinTaylorF2"] = spa_length_in_time
 _filter_time_lengths["TaylorF2NL"] = spa_length_in_time
 _filter_time_lengths["PreTaylorF2"] = spa_length_in_time
