@@ -301,7 +301,14 @@ class InjFilterRejector(object):
         if self.chirp_time_window is not None:
             m1 = bank.table[t_num]['mass1']
             m2 = bank.table[t_num]['mass2']
-            tau0_temp, _ = mass1_mass2_to_tau0_tau3(m1, m2, self.f_lower)
+            # if hasattr(self.table, 'f_ref'):
+            #     fref = self.table['f_ref']
+            if hasattr(self.table, 'f_lower'):
+                f_low = self.table[t_num]['f_lower']
+            else:
+                f_low = self.f_lower
+
+            tau0_temp, _ = mass1_mass2_to_tau0_tau3(m1, m2, f_low)
             for inj in self.injection_params.table:
                 if isinstance(inj, np.record):
                     # hdf format file

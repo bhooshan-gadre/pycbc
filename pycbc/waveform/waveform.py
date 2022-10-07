@@ -894,6 +894,12 @@ def imrphenomd_length_in_time(**kwds):
     """
     return get_imr_length("IMRPhenomD", **kwds)
 
+def imrphenomxe_length_in_time(**kwds):
+    """Stub for holding the calculation of IMRPhenomD waveform duration.
+    """
+    return get_imr_length("IMRPhenomXEv1", **kwds)
+    # return get_imr_length("IMRPhenomXE", **kwds)
+
 def imrphenomhm_length_in_time(**kwargs):
     """Estimates the duration of IMRPhenom waveforms that include higher modes.
     """
@@ -959,8 +965,8 @@ _filter_time_lengths["IMRPhenomHM"] = imrphenomhm_length_in_time
 _filter_time_lengths["IMRPhenomPv3HM"] = imrphenomhm_length_in_time
 _filter_time_lengths["IMRPhenomXHM"] = imrphenomhm_length_in_time
 _filter_time_lengths["IMRPhenomXPHM"] = imrphenomhm_length_in_time
-_filter_time_lengths["IMRPhenomXEv1"] = imrphenomhm_length_in_time
-_filter_time_lengths["IMRPhenomXE"] = imrphenomhm_length_in_time
+_filter_time_lengths["IMRPhenomXEv1"] = imrphenomxe_length_in_time
+_filter_time_lengths["IMRPhenomXE"] = imrphenomxe_length_in_time
 _filter_time_lengths["SpinTaylorF2"] = spa_length_in_time
 _filter_time_lengths["TaylorF2NL"] = spa_length_in_time
 _filter_time_lengths["PreTaylorF2"] = spa_length_in_time

@@ -361,6 +361,7 @@ class TemplateBank(object):
         hash_fields = ['mass1', 'mass2', 'inclination',
                        'spin1x', 'spin1y', 'spin1z',
                        'spin2x', 'spin2y', 'spin2z',]
+        hash_fields += ['eccentricity', 'mean_per_ano', 'f_ref']
 
         fields = [f for f in hash_fields if f in fields]
         template_hash = np.array([tuple_to_hash(v) for v in zip(*[self.table[p]
@@ -466,10 +467,15 @@ class TemplateBank(object):
             return
 
         injection_parameters = inj_filter_rejector.injection_params.table
-        fref = inj_filter_rejector.f_lower
         threshold = inj_filter_rejector.chirp_time_window
         m1= self.table['mass1']
         m2= self.table['mass2']
+        if hasattr(self.table, 'f_ref'):
+            fref = self.table['f_ref']
+        elif hasattr(self.table, 'f_lower'):
+            fref = self.table['f_lower']
+        else:
+            fref = inj_filter_rejector.f_lower
         tau0_temp, _ = pycbc.pnutils.mass1_mass2_to_tau0_tau3(m1, m2, fref)
         indices = []
 
@@ -519,7 +525,7 @@ class TemplateBank(object):
 class LiveFilterBank(TemplateBank):
     def __init__(self, filename, sample_rate, minimum_buffer,
                        approximant=None, increment=8, parameters=None,
-                       low_frequency_cutoff=None,
+                       low_frequency_cutoff=None, f_ref=None,
                        **kwds):
 
         self.increment = increment
@@ -527,6 +533,7 @@ class LiveFilterBank(TemplateBank):
         self.sample_rate = sample_rate
         self.minimum_buffer = minimum_buffer
         self.f_lower = low_frequency_cutoff
+        self.f_ref = f_ref
 
         super(LiveFilterBank, self).__init__(filename, approximant=approximant,
                 parameters=parameters, **kwds)
@@ -586,6 +593,7 @@ class LiveFilterBank(TemplateBank):
         approximant = self.approximant(index)
         f_end = self.end_frequency(index)
         flow = self.table[index].f_lower
+        # f_ref = self.table[index].f_ref
 
         # Determine the length of time of the filter, rounded up to
         # nearest power of two
@@ -615,7 +623,7 @@ class LiveFilterBank(TemplateBank):
         distance = 1.0 / DYN_RANGE_FAC
         htilde = pycbc.waveform.get_waveform_filter(
             zeros(flen, dtype=np.complex64), self.table[index],
-            approximant=approximant, f_lower=flow, f_final=f_end,
+            approximant=approximant, f_lower=flow, f_final=f_end, f_ref=f_ref
             delta_f=delta_f, delta_t=1.0 / self.sample_rate, distance=distance,
             **self.extra_args)
 
