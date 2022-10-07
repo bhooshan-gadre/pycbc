@@ -30,6 +30,7 @@ import lal
 import numpy
 from scipy.optimize import bisect, brentq, minimize
 from pycbc import conversions, libutils
+from pycbc.phenomxe_utils import get_XE_chirptime
 
 lalsimulation = libutils.import_optional('lalsimulation')
 
@@ -504,10 +505,13 @@ def frequency_cutoff_from_name(name, m1, m2, s1z, s2z):
     params = {"mass1":m1, "mass2":m2, "spin1z":s1z, "spin2z":s2z}
     return named_frequency_cutoffs[name](params)
 
-def _get_imr_duration(m1, m2, s1z, s2z, f_low, approximant="SEOBNRv4"):
+def _get_imr_duration(m1, m2, s1z, s2z, f_low, approximant="SEOBNRv4",
+        f_ref=10., eccentricity=0, mean_per_ano=0.):
     """Wrapper of lalsimulation template duration approximate formula"""
     m1, m2, s1z, s2z, f_low = float(m1), float(m2), float(s1z), float(s2z),\
                               float(f_low)
+    f_ref, eccentricity, mean_per_ano = float(f_ref), float(eccentricity),\
+            float(mean_per_ano)
     if approximant == "SEOBNRv2":
         chi = lalsimulation.SimIMRPhenomBComputeChi(m1, m2, s1z, s2z)
         time_length = lalsimulation.SimIMRSEOBNRv2ChirpTimeSingleSpin(
@@ -526,6 +530,9 @@ def _get_imr_duration(m1, m2, s1z, s2z, f_low, approximant="SEOBNRv4"):
         time_length = lalsimulation.SimInspiralTaylorF2ReducedSpinChirpTime(
             f_low, m1 * lal.MSUN_SI, m2 * lal.MSUN_SI, chi, -1
         )
+    elif approximant == "IMRPhenomXEv1":
+        time_length = get_XE_chirptime(m1, m2, s1z, s2z, \
+                eccentricity, mean_per_ano, fref, f_low)
     else:
         raise RuntimeError("I can't calculate a duration for %s" % approximant)
     # FIXME Add an extra factor of 1.1 for 'safety' since the duration
