@@ -623,7 +623,7 @@ class LiveFilterBank(TemplateBank):
         distance = 1.0 / DYN_RANGE_FAC
         htilde = pycbc.waveform.get_waveform_filter(
             zeros(flen, dtype=np.complex64), self.table[index],
-            approximant=approximant, f_lower=flow, f_final=f_end, f_ref=f_ref
+            approximant=approximant, f_lower=flow, f_final=f_end, f_ref=f_ref,
             delta_f=delta_f, delta_t=1.0 / self.sample_rate, distance=distance,
             **self.extra_args)
 

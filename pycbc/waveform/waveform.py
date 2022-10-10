@@ -876,6 +876,7 @@ def get_imr_length(approx, **kwds):
     eccentricity = float(kwds['eccentricity']) if 'eccentricity' in kwds else 0.
     mean_per_ano = float(kwds['mean_per_ano']) if 'mean_per_ano' in kwds else 0.
     # 10% margin of error is incorporated in the pnutils function
+    print(f'From get IMR length .. approx, fref, ecc = {approx}, {f_ref}, {eccentricity}')
     return pnutils.get_imr_duration(m1, m2, s1z, s2z, f_low, approximant=approx,
             f_ref=f_ref, eccentricity=eccentricity, mean_per_ano=mean_per_ano)
 
@@ -1026,6 +1027,8 @@ def get_waveform_filter(out, template=None, **kwargs):
     n = len(out)
 
     input_params = props(template, **kwargs)
+
+    print('Input params from get waveform filter = {}'.format(input_params))
 
     if input_params['approximant'] in filter_approximants(_scheme.mgr.state):
         wav_gen = filter_wav[type(_scheme.mgr.state)]
