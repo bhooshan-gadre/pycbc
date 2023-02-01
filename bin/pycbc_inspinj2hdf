@@ -43,24 +43,30 @@ args = parser.parse_args()
 
 pycbc.init_logging(args.verbose)
 
-xinj = InjectionSet(args.injection_file)
+## If input if hdf5 file, just copy it.
+## FIXME: We can do this better like renaming the mapping parameters
+if args.injection_file.endswith(('.hdf', '.h5', '.hdf5')):
+    import shutil
+    shutil.copyfile(args.injection_file, args.output_file)
 
-data = {}
-for key in xinj.table[0].__slots__:
-    # Some XML files can have empty columns which are read as None in python.
-    # For these cases we ignore the columns so they do not appear in the output
-    # HDF file. (Such XML files cannot currently be read by LALSuite C code.)
-    if getattr(xinj.table[0], key) is not None:
-        data[str(key)] = numpy.array([getattr(t, key) for t in xinj.table])
+elif args.injection_file.endswith(('.xml', '.xml.gz', '.xmlgz')):
+    xinj = InjectionSet(args.injection_file)
+    data = {}
+    for key in xinj.table[0].__slots__:
+        # Some XML files can have empty columns which are read as None in python.
+        # For these cases we ignore the columns so they do not appear in the output
+        # HDF file. (Such XML files cannot currently be read by LALSuite C code.)
+        if getattr(xinj.table[0], key) is not None:
+            data[str(key)] = numpy.array([getattr(t, key) for t in xinj.table])
 
-for k in ['simulation_id', 'process_id']:
-    a = data.pop(k)
+    for k in ['simulation_id', 'process_id']:
+        a = data.pop(k)
 
-data['approximant'], data['phase_order'] = \
-        numpy.array([legacy_approximant_name(wf) for wf in data['waveform']]).T
-data['tc'] = data['geocent_end_time'] + 1e-9 * data['geocent_end_time_ns']
-data['dec'] = data['latitude']
-data['ra'] = data['longitude']
+    data['approximant'], data['phase_order'] = \
+            numpy.array([legacy_approximant_name(wf) for wf in data['waveform']]).T
+    data['tc'] = data['geocent_end_time'] + 1e-9 * data['geocent_end_time_ns']
+    data['dec'] = data['latitude']
+    data['ra'] = data['longitude']
 
-samples = FieldArray.from_kwargs(**data)
-CBCHDFInjectionSet.write(args.output_file, samples)
+    samples = FieldArray.from_kwargs(**data)
+    CBCHDFInjectionSet.write(args.output_file, samples)
