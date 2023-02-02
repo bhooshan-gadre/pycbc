@@ -639,12 +639,12 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
             f_l = f_lower
 
         ## xml files keep ecc and mean per ano in alphas and currently we are converting xmls to hdfs
-        if hasattr(inj, eccentricity):
+        if hasattr(inj, 'eccentricity'):
             eccentricity = inj.eccentricity
         else:
             eccentricity = inj.alpha4
 
-        if hasattr(inj, mean_per_ano):
+        if hasattr(inj, 'mean_per_ano'):
             mean_per_ano = inj.mean_per_ano
         else:
             mean_per_ano = inj.alpha5
