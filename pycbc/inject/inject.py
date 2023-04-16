@@ -24,26 +24,28 @@
 #
 """This module provides utilities for injecting signals into data"""
 
-import os
-import numpy as np
-import lal
 import copy
 import logging
+import os
 from abc import ABCMeta, abstractmethod
+
 import h5py
-from pycbc import waveform, frame, libutils
-from pycbc.opt import LimitedSizeDict
-from pycbc.waveform import (get_td_waveform, fd_det,
-                            get_td_det_waveform_from_fd_det)
-from pycbc.waveform import utils as wfutils
-from pycbc.waveform import ringdown_td_approximants
-from pycbc.types import float64, float32, TimeSeries, load_timeseries
-from pycbc.detector import Detector
-from pycbc.conversions import tau0_from_mass1_mass2
-from pycbc.filter import resample_to_delta_t
+import lal
+import numpy as np
+from ligo.lw import ligolw, lsctables
+from ligo.lw import utils as ligolw_utils
+
 import pycbc.io
+from pycbc import frame, libutils, waveform
+from pycbc.conversions import tau0_from_mass1_mass2
+from pycbc.detector import Detector
+from pycbc.filter import resample_to_delta_t
 from pycbc.io.ligolw import LIGOLWContentHandler
-from ligo.lw import utils as ligolw_utils, ligolw, lsctables
+from pycbc.opt import LimitedSizeDict
+from pycbc.types import TimeSeries, float32, float64, load_timeseries
+from pycbc.waveform import (fd_det, get_td_det_waveform_from_fd_det,
+                            get_td_waveform, ringdown_td_approximants)
+from pycbc.waveform import utils as wfutils
 
 sim = libutils.import_optional('lalsimulation')
 
@@ -704,24 +706,24 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
         elif hasattr(inj, 'alpha5'):
             mean_per_ano = inj.alpha5
 
-        if inj['approximant'] in fd_det:
-            strain = get_td_det_waveform_from_fd_det(
-                inj,
-                delta_t=delta_t,
-                f_lower=f_l,
-                eccentricity=eccentricity,
-                mean_per_ano=mean_per_ano,
-                ifos=detector_name,
-                **self.extra_args)[detector_name]
-            strain /= distance_scale
-        else:
-            # compute the waveform time series
-            ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-            f_ref = 10
-            if f_l > f_ref:
-                f_l = f_ref
+        try:
+            if inj['approximant'] in fd_det:
+                strain = get_td_det_waveform_from_fd_det(
+                    inj,
+                    delta_t=delta_t,
+                    f_lower=f_l,
+                    eccentricity=eccentricity,
+                    mean_per_ano=mean_per_ano,
+                    ifos=detector_name,
+                    **self.extra_args)[detector_name]
+                strain /= distance_scale
+            else:
+                # compute the waveform time series
+                ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
+                f_ref = 10
+                if f_l > f_ref:
+                    f_l = f_ref
 
-            try:
                 hp, hc = get_td_waveform(
                     inj,
                     delta_t=delta_t,
@@ -737,10 +739,10 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
                                    distance_scale=distance_scale)
                 return strain
 
-            except Exception as e:
-                logging.info(f"Failed to generate injection with error {e}")
-                logging.info(f"Injection parameters are {inj}")
-                return None
+        except Exception as e:
+            logging.info(f"Failed to generate injection with error {e}")
+            logging.info(f"Injection parameters are {inj}")
+            return None
 
     def end_times(self):
         """Return the end times of all injections"""
