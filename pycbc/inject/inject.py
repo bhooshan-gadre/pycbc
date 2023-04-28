@@ -324,6 +324,7 @@ class _XMLInjectionSet(object):
                                  eccentricity=eccentricity,
                                  mean_per_ano=mean_per_ano,
                                  f_lower=f_l,
+                                 f_ref=f_l,
                                  distance=inj.distance,
                                  **self.extra_args)
         return projector(detector_name,
@@ -721,6 +722,7 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
                     inj,
                     delta_t=delta_t,
                     f_lower=f_l,
+                    f_ref=f_l,
                     eccentricity=eccentricity,
                     mean_per_ano=mean_per_ano,
                     ifos=detector_name,
@@ -732,7 +734,8 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
 
                 hp, hc = get_td_waveform(inj,
                                          delta_t=delta_t,
-                                         f_lower=f_l if f_l < f_ref else f_ref,
+                                         f_lower=f_l,
+                                         f_ref=f_l,
                                          eccentricity=eccentricity,
                                          mean_per_ano=mean_per_ano,
                                          **self.extra_args)
