@@ -15,7 +15,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-
 #
 # =============================================================================
 #
@@ -50,17 +49,17 @@ else
 fi
 
 # Check that the proxy is valid
-grid-proxy-info -exists
+ecp-cert-info -exists
 RESULT=${?}
 if [ ${RESULT} -eq 0 ] ; then
-  PROXY_TYPE=`grid-proxy-info -type | tr -d ' '`
+  PROXY_TYPE=`ecp-cert-info -type | tr -d ' '`
   if [ x${PROXY_TYPE} == 'xRFC3820compliantimpersonationproxy' ] ; then
-    grid-proxy-info
+    ecp-cert-info
   else
     cp /tmp/x509up_u`id -u` /tmp/x509up_u`id -u`.orig
     grid-proxy-init -cert /tmp/x509up_u`id -u`.orig -key /tmp/x509up_u`id -u`.orig
     rm -f /tmp/x509up_u`id -u`.orig
-    grid-proxy-info
+    ecp-cert-info
   fi
 else
   echo "Error: Could not find a valid grid proxy to submit workflow."
@@ -68,11 +67,13 @@ else
 fi
 '''
 
+
 class ProfileShortcuts(object):
     """ Container of common methods for setting pegasus profile information
     on Executables and nodes. This class expects to be inherited from
     and for a add_profile method to be implemented.
     """
+
     def set_memory(self, size):
         """ Set the amount of memory that is required in megabytes
         """
@@ -109,8 +110,12 @@ class Executable(ProfileShortcuts):
     """ The workflow representation of an Executable
     """
     id = 0
-    def __init__(self, name, os='linux',
-                 arch='x86_64', installed=False,
+
+    def __init__(self,
+                 name,
+                 os='linux',
+                 arch='x86_64',
+                 installed=False,
                  container=None):
         self.logical_name = name + "_ID%s" % str(Executable.id)
         self.pegasus_name = name
@@ -124,22 +129,18 @@ class Executable(ProfileShortcuts):
         self.transformations = {}
 
     def create_transformation(self, site, url):
-        transform = Transformation(
-            self.logical_name,
-            site=site,
-            pfn=url,
-            is_stageable=self.installed,
-            arch=self.arch,
-            os_type=self.os,
-            container=self.container
-        )
+        transform = Transformation(self.logical_name,
+                                   site=site,
+                                   pfn=url,
+                                   is_stageable=self.installed,
+                                   arch=self.arch,
+                                   os_type=self.os,
+                                   container=self.container)
         transform.pycbc_name = self.pegasus_name
         for (namespace, key), value in self.profiles.items():
-            transform.add_profiles(
-                dax.Namespace(namespace),
-                key=key,
-                value=value
-            )
+            transform.add_profiles(dax.Namespace(namespace),
+                                   key=key,
+                                   value=value)
         self.transformations[site] = transform
 
     def add_profile(self, namespace, key, value):
@@ -156,8 +157,10 @@ class Transformation(dax.Transformation):
 
     def is_same_as(self, other):
         test_vals = ['namespace', 'version']
-        test_site_vals = ['arch', 'os_type', 'os_release',
-                          'os_version', 'bypass', 'container']
+        test_site_vals = [
+            'arch', 'os_type', 'os_release', 'os_version', 'bypass',
+            'container'
+        ]
         # Check for logical name first
         if not self.pycbc_name == other.pycbc_name:
             return False
@@ -194,9 +197,10 @@ class Transformation(dax.Transformation):
 
 
 class Node(ProfileShortcuts):
+
     def __init__(self, transformation):
         self.in_workflow = False
-        self.transformation=transformation
+        self.transformation = transformation
         self._inputs = []
         self._outputs = []
         self._dax_node = dax.Job(transformation)
@@ -324,11 +328,9 @@ class Node(ProfileShortcuts):
     def add_profile(self, namespace, key, value):
         """ Add profile information to this node at the DAX level
         """
-        self._dax_node.add_profiles(
-            dax.Namespace(namespace),
-            key=key,
-            value=value
-        )
+        self._dax_node.add_profiles(dax.Namespace(namespace),
+                                    key=key,
+                                    value=value)
 
     def _finalize(self):
         if len(self._raw_options):
@@ -342,7 +344,11 @@ class Node(ProfileShortcuts):
 class Workflow(object):
     """
     """
-    def __init__(self, name='my_workflow', directory=None, cache_file=None,
+
+    def __init__(self,
+                 name='my_workflow',
+                 directory=None,
+                 cache_file=None,
                  dax_file_name=None):
         self.name = name
         self._rc = dax.ReplicaCatalog()
@@ -371,7 +377,8 @@ class Workflow(object):
 
         # A pegasus job version of this workflow for use if it isncluded
         # within a larger workflow
-        self._as_job = SubWorkflow(self.filename, is_planned=False,
+        self._as_job = SubWorkflow(self.filename,
+                                   is_planned=False,
                                    _id=self.name)
         self._swinputs = []
 
@@ -536,7 +543,8 @@ class Workflow(object):
         elif isinstance(other, Workflow):
             return self.add_workflow(other)
         else:
-            raise TypeError('Cannot add type %s to this workflow' % type(other))
+            raise TypeError('Cannot add type %s to this workflow' %
+                            type(other))
 
     def traverse_workflow_io(self):
         """ If input is needed from another workflow within a larger
@@ -544,6 +552,7 @@ class Workflow(object):
         the destination and add the file to workflows input / output as
         needed.
         """
+
         def root_path(v):
             path = [v]
             while v.in_workflow:
@@ -563,7 +572,7 @@ class Workflow(object):
             # to a workflow that contains the job which needs it.
             for idx in range(input_root.index(common)):
                 child_wflow = input_root[idx]
-                parent_wflow = input_root[idx+1]
+                parent_wflow = input_root[idx + 1]
                 if inp not in child_wflow._as_job.get_outputs():
                     child_wflow._as_job.add_outputs(inp, stage_out=True)
                     parent_wflow._outputs += [inp]
@@ -577,8 +586,12 @@ class Workflow(object):
         for wf in self.sub_workflows:
             wf.traverse_workflow_io()
 
-    def save(self, filename=None, submit_now=False, plan_now=False,
-             output_map_path=None, root=True):
+    def save(self,
+             filename=None,
+             submit_now=False,
+             plan_now=False,
+             output_map_path=None,
+             root=True):
         """ Write this workflow to DAX file
         """
         if filename is None:
@@ -782,8 +795,7 @@ class SubWorkflow(dax.SubWorkflow):
 
         self.pycbc_planner_args[value] = option
 
-    def set_subworkflow_properties(self, output_map_file,
-                                   staging_site,
+    def set_subworkflow_properties(self, output_map_file, staging_site,
                                    cache_file):
 
         self.add_planner_arg('pegasus.dir.storage.mapper.replica.file',
@@ -793,7 +805,7 @@ class SubWorkflow(dax.SubWorkflow):
         # I think this is needed to deal with cases where the subworkflow file
         # does not exist at submission time.
         bname = os.path.splitext(os.path.basename(self.file))[0]
-        self.add_planner_arg('basename',  bname)
+        self.add_planner_arg('basename', bname)
         self.add_planner_arg('output_sites', ['local'])
         self.add_planner_arg('cleanup', 'inplace')
         self.add_planner_arg('cluster', ['label', 'horizontal'])
@@ -815,6 +827,7 @@ class File(dax.File):
     A storage path is also available to indicate the desired final
     destination of this file.
     """
+
     def __init__(self, name):
         self.name = name
         self.node = None

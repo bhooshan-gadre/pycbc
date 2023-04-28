@@ -295,30 +295,37 @@ class _XMLInjectionSet(object):
         signal : float
             h(t) corresponding to the injection.
         """
-        f_l = inj.f_lower if f_lower is None else f_lower
+        if f_lower:
+            f_l = f_lower
+        elif f_lower is None and hasattr(inj, 'f_lower'):
+            f_l = inj.f_lower
+        else:
+            f_l = 10.
 
         name, phase_order = legacy_approximant_name(inj.waveform)
 
-        ## xml files keep ecc and mean per ano in alphas
-        eccentricity = inj.alpha4
-        mean_per_ano = inj.alpha5
         ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-        f_ref = 10
-        if f_l > f_ref:
-            f_l = f_ref
+        eccentricity, mean_per_ano = 0., 0.
+        if hasattr(inj, 'eccentricity'):
+            eccentricity = inj.eccentricity
+        elif hasattr(inj, 'alpha4'):
+            eccentricity = inj.alpha4
+
+        if hasattr(inj, 'mean_per_ano'):
+            mean_per_ano = inj.mean_per_ano
+        elif hasattr(inj, 'alpha5'):
+            mean_per_ano = inj.alpha5
 
         # compute the waveform time series
-        hp, hc = get_td_waveform(
-            inj,
-            approximant=name,
-            delta_t=delta_t,
-            phase_order=phase_order,
-            eccentricity=eccentricity,
-            mean_per_ano=mean_per_ano,
-            f_ref=f_l,  ## Because this is how EOB treat it.
-            f_lower=f_l,
-            distance=inj.distance,
-            **self.extra_args)
+        hp, hc = get_td_waveform(inj,
+                                 approximant=name,
+                                 delta_t=delta_t,
+                                 phase_order=phase_order,
+                                 eccentricity=eccentricity,
+                                 mean_per_ano=mean_per_ano,
+                                 f_lower=f_l,
+                                 distance=inj.distance,
+                                 **self.extra_args)
         return projector(detector_name,
                          inj,
                          hp,
@@ -689,10 +696,12 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
         signal : float
             h(t) corresponding to the injection.
         """
-        if f_lower is None:
+        if f_lower:
+            f_l = f_lower
+        elif f_lower is None and hasattr(inj, 'f_lower'):
             f_l = inj.f_lower
         else:
-            f_l = f_lower
+            f_l = 10.
 
         ## xml files keep ecc and mean per ano in alphas and currently we are converting xmls to hdfs
         eccentricity, mean_per_ano = 0., 0.
@@ -720,18 +729,13 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
             else:
                 # compute the waveform time series
                 ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-                f_ref = 10
-                if f_l > f_ref:
-                    f_l = f_ref
 
-                hp, hc = get_td_waveform(
-                    inj,
-                    delta_t=delta_t,
-                    f_lower=f_l,
-                    eccentricity=eccentricity,
-                    mean_per_ano=mean_per_ano,
-                    f_ref=f_l,  ## Because this is how EOB treat it.
-                    **self.extra_args)
+                hp, hc = get_td_waveform(inj,
+                                         delta_t=delta_t,
+                                         f_lower=f_l if f_l < f_ref else f_ref,
+                                         eccentricity=eccentricity,
+                                         mean_per_ano=mean_per_ano,
+                                         **self.extra_args)
                 strain = projector(detector_name,
                                    inj,
                                    hp,
