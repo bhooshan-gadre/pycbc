@@ -316,6 +316,13 @@ class _XMLInjectionSet(object):
         elif hasattr(inj, 'alpha5'):
             mean_per_ano = inj.alpha5
 
+        if 'SEOBNRv4' in name:
+            f22_max = lalsim.EOBHighestInitialFreq(inj.mass1 + inj.mass2) - 0.1
+            if f_l < f22_max:
+                logging.inf(
+                    "f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
+                    .format(f_l, f22_max))
+                f_l = f22_max
         # compute the waveform time series
         hp, hc = get_td_waveform(inj,
                                  approximant=name,
@@ -324,7 +331,6 @@ class _XMLInjectionSet(object):
                                  eccentricity=eccentricity,
                                  mean_per_ano=mean_per_ano,
                                  f_lower=f_l,
-                                 f_ref=f_l,
                                  distance=inj.distance,
                                  **self.extra_args)
         return projector(detector_name,
@@ -732,10 +738,18 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
                 # compute the waveform time series
                 ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
 
+                if 'SEOBNRv4' in inj['approximant']:
+                    f22_max = lalsim.EOBHighestInitialFreq(inj.mass1 +
+                                                           inj.mass2) - 0.1
+                    if f_l < f22_max:
+                        logging.inf(
+                            "f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
+                            .format(f_l, f22_max))
+                        f_l = f22_max
+
                 hp, hc = get_td_waveform(inj,
                                          delta_t=delta_t,
                                          f_lower=f_l,
-                                         f_ref=f_l,
                                          eccentricity=eccentricity,
                                          mean_per_ano=mean_per_ano,
                                          **self.extra_args)
