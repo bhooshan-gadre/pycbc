@@ -327,9 +327,9 @@ def from_cli(opt,
 
     if injector is not None:
         logging.info("Applying injections")
-        inj_flower = 10.
+        #  inj_flower = 10.
         injections = \
-            injector.apply(strain, opt.channel_name.split(':')[0], f_lower = inj_flower,
+            injector.apply(strain, opt.channel_name.split(':')[0],  # f_lower = inj_flower,
                            distance_scale=opt.injection_scale_factor,
                            injection_sample_rate=opt.injection_sample_rate,
                            inj_filter_rejector=inj_filter_rejector)

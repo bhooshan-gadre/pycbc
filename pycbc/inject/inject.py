@@ -113,7 +113,7 @@ def fix_SEOBNRv4_f22_start(inj, approximant, f_l=10.):
         return f22_max
     else:
         return f_l
-    
+
 
 def set_injection_f_low(inj, f_lower=None, default=10.):
     if f_lower:
@@ -343,12 +343,12 @@ class _XMLInjectionSet(object):
 
         ## This is used only when we call this function as stand alone.
         ## When called from apply, f_lower in usually set there.
-        f_l = set_injection_f_low(inj, f_lower=f_lower, default=10.):
+        f_l = set_injection_f_low(inj, f_lower=f_lower, default=10.)
         f_l = fix_SEOBNRv4_f22_start(inj, approximant=name, f_l=f_l)
         eccentricity, mean_per_ano = fix_eccentric_parameters_for_injections(
             inj)
         inj.f_lower = f_l
-        logging.info("FLOW: using inj-f-lower = {:.2f}".format(fl))
+        logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
 
         # compute the waveform time series
         hp, hc = get_td_waveform(inj,
@@ -732,14 +732,14 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
         """
         ## This is used only when we call this function as stand alone.
         ## When called from apply, f_lower in usually set there.
-        f_l = set_injection_f_low(inj, f_lower=f_lower, default=10.):
+        f_l = set_injection_f_low(inj, f_lower=f_lower, default=10.)
 
         eccentricity, mean_per_ano = fix_eccentric_parameters_for_injections(
             inj)
         try:
             if inj['approximant'] in fd_det:
                 inj.f_lower = f_l
-                logging.info("FLOW: using inj-f-lower = {:.2f}".format(fl))
+                logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
 
                 strain = get_td_det_waveform_from_fd_det(
                     inj,
@@ -754,9 +754,11 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
             else:
                 # compute the waveform time series
                 ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-                f_l = fix_SEOBNRv4_f22_start(inj, approximant=inj['approximant'], f_l=f_l)
+                f_l = fix_SEOBNRv4_f22_start(inj,
+                                             approximant=inj['approximant'],
+                                             f_l=f_l)
                 inj.f_lower = f_l
-                logging.info("FLOW: using inj-f-lower = {:.2f}".format(fl))
+                logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
 
                 hp, hc = get_td_waveform(inj,
                                          delta_t=delta_t,
@@ -772,7 +774,8 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
             return strain
 
         except Exception as e:
-            logging.info(f"FAILURE: Failed to generate injection with error {e}")
+            logging.info(
+                f"FAILURE: Failed to generate injection with error {e}")
             logging.info(f"Injection parameters are {inj}")
             return None
 
