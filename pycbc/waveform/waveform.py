@@ -213,8 +213,6 @@ def _check_lal_pars(p):
 
 def _lalsim_td_waveform(**p):
     lal_pars = _check_lal_pars(p)
-    print('f low', p['f_lower'])
-    print('f ref', p['f_ref'])
     #nonGRparams can be straightforwardly added if needed, however they have to
     # be invoked one by one
     try:

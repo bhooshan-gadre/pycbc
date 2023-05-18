@@ -80,6 +80,50 @@ def set_sim_data(inj, field, data):
         setattr(inj, sim_field, data)
 
 
+def fix_eccentric_parameters_for_injections(inj):
+    eccentricity, mean_per_ano = 0., 0.
+    if hasattr(inj, 'eccentricity'):
+        eccentricity = inj.eccentricity
+    elif hasattr(inj, 'alpha4'):
+        eccentricity = inj.alpha4
+
+    if hasattr(inj, 'mean_per_ano'):
+        mean_per_ano = inj.mean_per_ano
+    elif hasattr(inj, 'alpha5'):
+        mean_per_ano = inj.alpha5
+    return eccentricity, mean_per_ano
+
+
+## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
+def fix_SEOBNRv4_f22_start(inj, approximant, f_l=10.):
+    if 'SEOBNRv4' in approximant:
+        f22_max = lalsim.EOBHighestInitialFreq(
+            inj.mass1 +
+            inj.mass2) - 0.1  ## tiny factor to take care of numerical issues
+
+        ## FIXME: For eccentric, we would prefer as separate function
+        ## For now, we use half of the highest initial freq to generate waveform with higher eccentricity.
+        if 'SEOBNRv4E' in approximant:
+            f22_max /= 2.
+
+        if f_l < f22_max:
+            logging.inf(
+                "FLOW FIX: f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
+                .format(f_l, f22_max))
+        return f22_max
+    else:
+        return f_l
+    
+
+def set_injection_f_low(inj, f_lower=None, default=10.):
+    if f_lower:
+        return f_lower
+    elif f_lower is None and hasattr(inj, 'f_lower'):
+        return inj.f_lower
+    else:
+        return default
+
+
 def projector(detector_name, inj, hp, hc, distance_scale=1):
     """ Use the injection row to project the polarizations into the
     detector frame
@@ -295,34 +339,17 @@ class _XMLInjectionSet(object):
         signal : float
             h(t) corresponding to the injection.
         """
-        if f_lower:
-            f_l = f_lower
-        elif f_lower is None and hasattr(inj, 'f_lower'):
-            f_l = inj.f_lower
-        else:
-            f_l = 10.
-
         name, phase_order = legacy_approximant_name(inj.waveform)
 
-        ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-        eccentricity, mean_per_ano = 0., 0.
-        if hasattr(inj, 'eccentricity'):
-            eccentricity = inj.eccentricity
-        elif hasattr(inj, 'alpha4'):
-            eccentricity = inj.alpha4
+        ## This is used only when we call this function as stand alone.
+        ## When called from apply, f_lower in usually set there.
+        f_l = set_injection_f_low(inj, f_lower=f_lower, default=10.):
+        f_l = fix_SEOBNRv4_f22_start(inj, approximant=name, f_l=f_l)
+        eccentricity, mean_per_ano = fix_eccentric_parameters_for_injections(
+            inj)
+        inj.f_lower = f_l
+        logging.info("FLOW: using inj-f-lower = {:.2f}".format(fl))
 
-        if hasattr(inj, 'mean_per_ano'):
-            mean_per_ano = inj.mean_per_ano
-        elif hasattr(inj, 'alpha5'):
-            mean_per_ano = inj.alpha5
-
-        if 'SEOBNRv4' in name:
-            f22_max = lalsim.EOBHighestInitialFreq(inj.mass1 + inj.mass2) - 0.1
-            if f_l < f22_max:
-                logging.inf(
-                    "f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
-                    .format(f_l, f22_max))
-                f_l = f22_max
         # compute the waveform time series
         hp, hc = get_td_waveform(inj,
                                  approximant=name,
@@ -703,27 +730,17 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
         signal : float
             h(t) corresponding to the injection.
         """
-        if f_lower:
-            f_l = f_lower
-        elif f_lower is None and hasattr(inj, 'f_lower'):
-            f_l = inj.f_lower
-        else:
-            f_l = 10.
+        ## This is used only when we call this function as stand alone.
+        ## When called from apply, f_lower in usually set there.
+        f_l = set_injection_f_low(inj, f_lower=f_lower, default=10.):
 
-        ## xml files keep ecc and mean per ano in alphas and currently we are converting xmls to hdfs
-        eccentricity, mean_per_ano = 0., 0.
-        if hasattr(inj, 'eccentricity'):
-            eccentricity = inj.eccentricity
-        elif hasattr(inj, 'alpha4'):
-            eccentricity = inj.alpha4
-
-        if hasattr(inj, 'mean_per_ano'):
-            mean_per_ano = inj.mean_per_ano
-        elif hasattr(inj, 'alpha5'):
-            mean_per_ano = inj.alpha5
-
+        eccentricity, mean_per_ano = fix_eccentric_parameters_for_injections(
+            inj)
         try:
             if inj['approximant'] in fd_det:
+                inj.f_lower = f_l
+                logging.info("FLOW: using inj-f-lower = {:.2f}".format(fl))
+
                 strain = get_td_det_waveform_from_fd_det(
                     inj,
                     delta_t=delta_t,
@@ -737,15 +754,9 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
             else:
                 # compute the waveform time series
                 ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-
-                if 'SEOBNRv4' in inj['approximant']:
-                    f22_max = lalsim.EOBHighestInitialFreq(inj.mass1 +
-                                                           inj.mass2) - 0.1
-                    if f_l < f22_max:
-                        logging.inf(
-                            "f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
-                            .format(f_l, f22_max))
-                        f_l = f22_max
+                f_l = fix_SEOBNRv4_f22_start(inj, approximant=inj['approximant'], f_l=f_l)
+                inj.f_lower = f_l
+                logging.info("FLOW: using inj-f-lower = {:.2f}".format(fl))
 
                 hp, hc = get_td_waveform(inj,
                                          delta_t=delta_t,
@@ -758,10 +769,10 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
                                    hp,
                                    hc,
                                    distance_scale=distance_scale)
-                return strain
+            return strain
 
         except Exception as e:
-            logging.info(f"Failed to generate injection with error {e}")
+            logging.info(f"FAILURE: Failed to generate injection with error {e}")
             logging.info(f"Injection parameters are {inj}")
             return None
 
