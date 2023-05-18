@@ -97,6 +97,7 @@ def fix_eccentric_parameters_for_injections(inj):
 ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
 def fix_SEOBNRv4_f22_start(inj, approximant, f_l=10.):
     if 'SEOBNRv4' in approximant:
+        import lalsimulation as lalsim
         f22_max = lalsim.EOBHighestInitialFreq(
             inj.mass1 +
             inj.mass2) - 0.1  ## tiny factor to take care of numerical issues
