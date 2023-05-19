@@ -107,7 +107,7 @@ def fix_SEOBNRv4_f22_start(inj, approximant, f_l=10.):
         if 'SEOBNRv4E' in approximant:
             f22_max /= 2.
 
-        if f_l < f22_max:
+        if f_l > f22_max:
             logging.inf(
                 "FLOW FIX: f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
                 .format(f_l, f22_max))
