@@ -108,15 +108,18 @@ def fix_SEOBNRv4_f22_start(inj, approximant, f_l=10.):
             f22_max /= 2.
 
         if f_l > f22_max:
-            logging.inf(
+            logging.info(
                 "FLOW FIX: f_lower of {} is lower than what SEOB can generate with. setting f_lower to {}"
                 .format(f_l, f22_max))
-        return f22_max
+            return f22_max
+        else:
+            return f_l
     else:
         return f_l
 
 
 def set_injection_f_low(inj, f_lower=None, default=10.):
+    logging.info("setting f lower. Given is {}".format(f_lower))
     if f_lower:
         return f_lower
     elif f_lower is None and hasattr(inj, 'f_lower'):
