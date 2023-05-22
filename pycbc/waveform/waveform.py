@@ -648,7 +648,6 @@ def get_td_waveform(template=None, **kwargs):
         The cross polarization of the waveform.
     """
     input_params = props(template, **kwargs)
-    print('f ref, flow', input_params['f_lower'], input_params['f_ref'])
     wav_gen = td_wav[type(_scheme.mgr.state)]
     if input_params['approximant'] not in wav_gen:
         raise ValueError("Approximant %s not available" %
