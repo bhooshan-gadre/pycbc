@@ -4,3 +4,5 @@ dqsegdb2>=1.0.1
 amqplib
 htchirp >= 2.0
 dqsegdb >= 2.0.0
+swig==3.0.12
+GitPython
