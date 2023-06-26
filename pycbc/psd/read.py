@@ -247,7 +247,7 @@ class PrecomputedTimeVaryingPSD(object):
             raise ValueError(err_msg)
 
         if self.psd_inverse_length:
-            best_psd = inverse_spectrum_truncation(best_psd,
+            best_psd = pycbc.psd.inverse_spectrum_truncation(best_psd,
                                               int(self.psd_inverse_length *
                                                   self.sample_rate),
                                               low_frequency_cutoff=self.f_low,
