@@ -549,7 +549,7 @@ def associate_psds_to_segments(opt, fd_segments, gwstrain, flen, delta_f, flow,
         tpsd = PrecomputedTimeVaryingPSD(opt,
                                          length=len(fd_segments[0].data),
                                          delta_f=fd_segments[0].delta_f,
-                                         fd_segments[0].sample_rate)
+                                         sample_rate=fd_segments[0].sample_rate)
 
         for fd_segment in fd_segments:
             inp_seg = segments.segment(fd_segment.start_time,
