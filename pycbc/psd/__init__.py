@@ -546,10 +546,10 @@ def associate_psds_to_segments(opt, fd_segments, gwstrain, flen, delta_f, flow,
         not already in that precision.
     """
     if opt.precomputed_psd_file:
-        tpsd = PrecomputedTimeVaryingPSD(opt.precomputed_psd_file,
+        tpsd = PrecomputedTimeVaryingPSD(opt,
                                          length=len(fd_segments[0].data),
                                          delta_f=fd_segments[0].delta_f,
-                                         f_low=opt.low_frequency_cutoff)
+                                         fd_segments[0].sample_rate)
 
         for fd_segment in fd_segments:
             inp_seg = segments.segment(fd_segment.start_time,
