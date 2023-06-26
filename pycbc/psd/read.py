@@ -197,7 +197,7 @@ def from_xml(filename, length, delta_f, low_freq_cutoff, ifo_string=None,
 class PrecomputedTimeVaryingPSD(object):
     def __init__(self, opt, length, delta_f, sample_rate):
         self.opt = opt
-        self.file_name = opt.precomputed_psd_file,
+        self.file_name = opt.precomputed_psd_file
         self.f_low = opt.low_frequency_cutoff
         self.length = length
         self.delta_f = delta_f
