@@ -84,7 +84,7 @@ opts = parser.parse_args()
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
-snr_filter = '(self.snr>%f)' % (opts.min_snr) if opts.min_snr > 0. else None 
+snr_filter = '(self.snr>%f)' % (opts.min_snr) if opts.min_snr > 0. else None
 filts = [f for f in [snr_filter, opts.filter_string] if f is not None]
 filter_func = ' & '.join(filts) if filts else None
 
@@ -127,7 +127,7 @@ ax = fig.gca()
 
 if opts.z_var == 'density':
     norm = LogNorm()
-    hb = ax.hexbin(x, y, norm=norm, vmin=1, **hexbin_style)
+    hb = ax.hexbin(x, y, norm=norm, **hexbin_style)
     fig.colorbar(hb, ticks=LogLocator(subs=range(10)))
 elif opts.z_var in ranking.sngls_ranking_function_dict:
     cb_style = {}

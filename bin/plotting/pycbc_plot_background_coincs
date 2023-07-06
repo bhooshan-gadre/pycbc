@@ -26,8 +26,8 @@ parser.add_argument('--max-z', type=float, help='Optional maximum z value')
 parser.add_argument('--grid-size', default=100, help="Number of hexbins", type=int)
 parser.add_argument('--dpi', type=int, default=200)
 parser.add_argument('--output-file')
-args = parser.parse_args()     
-                    
+args = parser.parse_args()
+
 f = h5py.File(args.coinc_file)
 bdata = f['background_exc']
 x = get_var(bdata, args.x_var)
@@ -46,8 +46,8 @@ if args.max_z is not None:
 fig = pylab.figure()
 ax = fig.gca()
 if args.z_var == 'density':
-    hb = ax.hexbin(x, y, norm=LogNorm(), vmin=1, **hexbin_style)
-    fig.colorbar(hb, ticks=LogLocator(subs=range(10)))    
+    hb = ax.hexbin(x, y, norm=LogNorm(), **hexbin_style)
+    fig.colorbar(hb, ticks=LogLocator(subs=range(10)))
 elif args.z_var == 'ranking_stat':
     hb = ax.hexbin(x, y, C=bdata['stat'][:], reduce_C_function=max, **hexbin_style)
     fig.colorbar(hb)
@@ -56,4 +56,4 @@ ax.set_xlabel(args.x_var)
 ax.set_ylabel(args.y_var)
 ax.set_title("Coincident Background Triggers, %s" % args.z_var)
 fig.savefig(args.output_file, dpi=args.dpi)
-                          
+
