@@ -18,7 +18,7 @@ parser.add_argument('--output-file', required=True,
                     help='Destination file for the plot')
 parser.add_argument('--bin-type', choices=['spin', 'mchirp', 'total_mass',
                                            'max_mass', 'eta',
-                                           'template_duration'],
+                                           'template_duration', 'eccentricity'],
                     default='mchirp',
                     help="Parameter used to bin injections. Default 'mchirp'")
 # FIXME: Make bins options properly optional, if no bins are specified then
@@ -134,6 +134,7 @@ for fi in args.injection_file:
         # y-components not used but read them in for symmetry
         s1y, s2y = f['injections/spin1y'][:], f['injections/spin2y'][:]
         inc = f['injections/inclination'][:]
+        ecc = f['injections/eccentricity'][:]
 
         mchirp = pycbc.pnutils.mass1_mass2_to_mchirp_eta(m1, m2)[0]
         if args.bin_type == 'mchirp':
@@ -152,6 +153,8 @@ for fi in args.injection_file:
             # Only valid/useful for non-spin or aligned-spin signals
             pvals = pycbc.pnutils.get_imr_duration(m1, m2, s1z, s2z,
                                                    f_low=args.f_lower)
+        elif args.bin_type == 'eccentricity':
+            pvals = ecc
         else:
             raise RuntimeError('Unrecognized --bin-type value!')
 
@@ -194,7 +197,8 @@ labels = {
     'total_mass' : "$ M_{\\rm total} \in [%5.2f, %5.2f] M_\odot $",
     'max_mass'   : "$ {\\rm max}(m_1, m_2) \in [%5.2f, %5.2f] M_\odot $",
     'spin'       : "$ \\chi_{\\rm eff} \in [%5.2f, %5.2f] $",
-    'template_duration' : "$ \\tau \in [%5.2f, %5.2f] s $"
+    'template_duration' : "$ \\tau \in [%5.2f, %5.2f] s $",
+    'eccentricity' : "$ e_0 \in [%5.2f, %5.2f] $",
 }
 
 ylabel = xlabel = ""

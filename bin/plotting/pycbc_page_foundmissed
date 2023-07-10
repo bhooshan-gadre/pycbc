@@ -23,13 +23,14 @@ labels={'mchirp': 'Chirp Mass',
         'redshift': 'Redshift',
         'time': 'Time (s)',
         'effective_spin': 'Effective Inspiral Spin',
+        'eccentricity': 'Eccentricity'
        }
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--injection-file',
                     help="The hdf injection file to plot", required=True)
 parser.add_argument('--axis-type', default='mchirp', choices=['mchirp',
-                    'effective_spin', 'time', 'mtotal', 'mass_ratio'])
+                    'effective_spin', 'time', 'mtotal', 'mass_ratio', 'eccentricity'])
 parser.add_argument('--log-x', action='store_true', default=False)
 parser.add_argument('--distance-type', default='decisive_optimal_snr',
                     choices=list(labels),
@@ -82,6 +83,7 @@ s1z = f['injections/spin1z'][:]
 s2z = f['injections/spin2z'][:]
 dist = f['injections/distance'][:]
 m1, m2 = f['injections/mass1'][:], f['injections/mass2'][:]
+ecc = f['injections/eccentricity'][:]
 
 vals = {}
 vals['mchirp'], eta = pycbc.pnutils.mass1_mass2_to_mchirp_eta(m1, m2)
@@ -91,7 +93,7 @@ vals['time'] = time
 vals['mtotal'] = m1 + m2
 # use convention that q>1
 vals['mass_ratio'] = numpy.maximum(m1/m2, m2/m1)
-
+vals['eccentricity'] = ecc
 dvals = {}
 
 if 'ifos' in f.attrs:
