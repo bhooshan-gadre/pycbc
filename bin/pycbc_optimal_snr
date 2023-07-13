@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
 """
 Compute the optimal SNRs for every injection in an input HDF file or 
 sim_inspiral table and store the result in HDF file datasets or in the
@@ -40,13 +39,16 @@ from pycbc.io.ligolw import get_table_columns
 
 
 class TimeIndependentPSD(object):
+
     def __init__(self, psd_series):
         self.psd_series = psd_series
 
     def __call__(self, time=None):
         return self.psd_series
 
+
 class TimeVaryingPSD(object):
+
     def __init__(self, file_name, length=None, delta_f=None, f_low=None):
         with h5py.File(file_name, 'r') as f:
             self.file_name = file_name
@@ -62,8 +64,7 @@ class TimeVaryingPSD(object):
         self.f_low = f_low
 
     def __call__(self, time=None):
-        mask = np.logical_and(self.start_times <= time,
-                              self.end_times > time)
+        mask = np.logical_and(self.start_times <= time, self.end_times > time)
         if not mask.any():
             return None
         center_times = (self.start_times[mask] + self.end_times[mask]) / 2.
@@ -90,18 +91,20 @@ class TimeVaryingPSD(object):
                 psd = psd2
             if self.f_low is not None and self.f_low < self.file_f_low:
                 # avoid using the PSD below the f_low given in the file
-                k = int(file_f_low / psd.delta_f)
+                k = int(self.file_f_low / psd.delta_f)
                 psd[0:k] = np.inf
             self._curr_psd[curr_pid] = psd
             self._curr_psd_index[curr_pid] = index
         return self._curr_psd[curr_pid]
 
+
 def parse_injection_range(num_inj, rangestr):
     part = int(rangestr.split('/')[0])
     pieces = int(rangestr.split('/')[1])
-    tmin =  num_inj * part // pieces
-    tmax =  num_inj * (part + 1) // pieces
+    tmin = num_inj * part // pieces
+    tmax = num_inj * (part + 1) // pieces
     return tmin, tmax
+
 
 def get_gc_end_time(injection):
     """Return the geocenter end time of an injection. Required for seamless
@@ -118,62 +121,91 @@ def get_gc_end_time(injection):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action=pycbc.version.Version)
-    parser.add_argument('--input-file', '-i', dest='injection_file',
+    parser.add_argument('--input-file',
+                        '-i',
+                        dest='injection_file',
                         required=True,
                         help='Input LIGOLW file defining injections')
-    parser.add_argument('--injection-f-ref', type=float,
+    parser.add_argument('--injection-f-ref',
+                        type=float,
                         help='Reference frequency in Hz for '
-                             'creating CBC injections from an XML '
-                             'file.')
-    parser.add_argument('--injection-f-final', type=float,
+                        'creating CBC injections from an XML '
+                        'file.')
+    parser.add_argument('--injection-f-final',
+                        type=float,
                         help='Override the f_final field of a CBC '
-                             'XML injection file.')
-    parser.add_argument('--input-sort', type=str, choices=['random', 'time'],
+                        'XML injection file.')
+    parser.add_argument('--input-sort',
+                        type=str,
+                        choices=['random', 'time'],
                         default='random',
                         help='Sort injections by the given criterion before '
-                             'processing them. Sorting by time may speed up '
-                             'the calculation when the approximant is very '
-                             'fast and injections are tightly spaced in time')
-    parser.add_argument('--output-file', '-o', dest='out_file', required=True,
+                        'processing them. Sorting by time may speed up '
+                        'the calculation when the approximant is very '
+                        'fast and injections are tightly spaced in time')
+    parser.add_argument('--output-file',
+                        '-o',
+                        dest='out_file',
+                        required=True,
                         help='Output LIGOLW file')
-    parser.add_argument('--f-low', type=float, default=30.,
+    parser.add_argument('--f-low',
+                        type=float,
+                        default=30.,
                         help='Start frequency of matched-filter integration '
-                             'in Hz (default %(default)s)')
-    parser.add_argument('--seg-length', type=float, default=256,
-                        help='Segment duration in seconds (default %(default)s)')
-    parser.add_argument('--sample-rate', type=float, default=16384,
+                        'in Hz (default %(default)s)')
+    parser.add_argument(
+        '--seg-length',
+        type=float,
+        default=256,
+        help='Segment duration in seconds (default %(default)s)')
+    parser.add_argument('--sample-rate',
+                        type=float,
+                        default=16384,
                         help='Data sample rate in Hz (default %(default)s)')
-    parser.add_argument('--ifos', nargs='+',
+    parser.add_argument('--ifos',
+                        nargs='+',
                         help='Specify ifos for default HDF dataset output')
-    parser.add_argument('--snr-columns', nargs='+', action=MultiDetOptionAction,
-                        metavar='DETECTOR:COLUMN',
-                        help='For sim_inspiral table output, specify columns'
-                        ' to store the optimal SNR for each detector. COLUMN'
-                        ' should be an existing sim_inspiral column containing'
-                        ' no useful data, alpha1, alpha2 etc. are good'
-                        ' candidates. For HDF output the --ifos option should be'
-                        ' used, datasets will be named eg "optimal_snr_H1"')
-    parser.add_argument('--cores', default=1, type=int,
+    parser.add_argument(
+        '--snr-columns',
+        nargs='+',
+        action=MultiDetOptionAction,
+        metavar='DETECTOR:COLUMN',
+        help='For sim_inspiral table output, specify columns'
+        ' to store the optimal SNR for each detector. COLUMN'
+        ' should be an existing sim_inspiral column containing'
+        ' no useful data, alpha1, alpha2 etc. are good'
+        ' candidates. For HDF output the --ifos option should be'
+        ' used, datasets will be named eg "optimal_snr_H1"')
+    parser.add_argument('--cores',
+                        default=1,
+                        type=int,
                         help='Parallelize the computation over the given '
-                             'number of cores')
-    parser.add_argument('--ignore-waveform-errors', action='store_true',
+                        'number of cores')
+    parser.add_argument('--ignore-waveform-errors',
+                        action='store_true',
                         help='Ignore errors in waveform generation and keep '
-                             'the corresponding column unchanged')
-    parser.add_argument('--verbose', action='store_true',
+                        'the corresponding column unchanged')
+    parser.add_argument('--verbose',
+                        action='store_true',
                         help='Print which injection is going to be attempted '
-                             'next and when it completes. Use this to debug '
-                             'misbehaving approximants which crash or quit '
-                             'the Python interpreter')
-    parser.add_argument('--progress', action='store_true',
+                        'next and when it completes. Use this to debug '
+                        'misbehaving approximants which crash or quit '
+                        'the Python interpreter')
+    parser.add_argument('--progress',
+                        action='store_true',
                         help='Show a progress bar (requires tqdm)')
     psd_group = pycbc.psd.insert_psd_option_group_multi_ifo(parser)
-    psd_group.add_argument('--time-varying-psds', nargs='*', metavar='FILE',
-                           help='Instead of time-independent PSDs, use time-varying '
-                           'PSDs from the given HDF5 files and pick the appropriate '
-                           'PSD for each injection')
-    parser.add_argument('--injection-fraction-range', default='0/1',
+    psd_group.add_argument(
+        '--time-varying-psds',
+        nargs='*',
+        metavar='FILE',
+        help='Instead of time-independent PSDs, use time-varying '
+        'PSDs from the given HDF5 files and pick the appropriate '
+        'PSD for each injection')
+    parser.add_argument('--injection-fraction-range',
+                        default='0/1',
                         help='Optional, analyze only a certain range of the '
-                             'injections. Format PART/NUM_PARTS')
+                        'injections. Format PART/NUM_PARTS')
     opts = parser.parse_args()
 
     if opts.ifos is not None:
@@ -226,9 +258,12 @@ if __name__ == '__main__':
         IFO and end time"""
         # leave 4 s of padding at the end for possible ringdown
         start_time = int(injection_time + 4. - seg_len)
-        strain = TimeSeries(zeros(tlen, dtype=float32), delta_t=delta_t,
+        strain = TimeSeries(zeros(tlen, dtype=float32),
+                            delta_t=delta_t,
                             epoch=start_time)
-        injections.apply(strain, det, distance_scale=1./pycbc.DYN_RANGE_FAC,
+        injections.apply(strain,
+                         det,
+                         distance_scale=1. / pycbc.DYN_RANGE_FAC,
                          simulation_ids=[simulation_id])
         return make_frequency_series(strain)
 
@@ -242,18 +277,23 @@ if __name__ == '__main__':
                 continue
             logging.info('Trying injection %s at %s', inj.simulation_id, det)
             try:
-                wave = get_injection(injections, det, injection_time,
+                wave = get_injection(injections,
+                                     det,
+                                     injection_time,
                                      simulation_id=inj.simulation_id)
             except Exception as e:
                 if opts.ignore_waveform_errors:
-                    logging.warn('%s: waveform generation failed, skipping (%s)',
-                                 inj.simulation_id, e)
+                    logging.warn(
+                        '%s: waveform generation failed, skipping (%s)',
+                        inj.simulation_id, e)
                     continue
                 else:
-                    logging.error('%s: waveform generation failed with the '
-                                  'following exception', inj.simulation_id)
+                    logging.error(
+                        '%s: waveform generation failed with the '
+                        'following exception', inj.simulation_id)
                     raise
-            logging.info('Injection %s at %s completed', inj.simulation_id, det)
+            logging.info('Injection %s at %s completed', inj.simulation_id,
+                         det)
             sval = sigma(wave, psd=psd, low_frequency_cutoff=f_low)
             if ligolw:
                 setattr(inj, column, sval)
@@ -279,8 +319,7 @@ if __name__ == '__main__':
         for det, column in opts.snr_columns.items():
             if column in inj_table:
                 continue
-            inj_table = inj_table.add_fields(np.zeros(len(inj_table)),
-                                             column)
+            inj_table = inj_table.add_fields(np.zeros(len(inj_table)), column)
 
         # make sure we have simulation IDs
         if 'simulation_id' not in inj_table:
@@ -297,10 +336,9 @@ if __name__ == '__main__':
     inj_table = sorted(inj_table, key=sort_func)
 
     if ligolw:
-        new_inj_table = lsctables.New(
-            lsctables.SimInspiralTable,
-            columns=get_table_columns(injections.table)
-        )
+        new_inj_table = lsctables.New(lsctables.SimInspiralTable,
+                                      columns=get_table_columns(
+                                          injections.table))
     else:
         new_inj_table = []
 
@@ -334,8 +372,8 @@ if __name__ == '__main__':
     new_inj_table.sort(key=get_gc_end_time)
 
     if not ligolw:
-        new_inj_table = pycbc.io.FieldArray.from_records(
-                new_inj_table, dtype=inj_dtype)
+        new_inj_table = pycbc.io.FieldArray.from_records(new_inj_table,
+                                                         dtype=inj_dtype)
 
     logging.info('Writing output')
 
