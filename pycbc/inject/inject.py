@@ -741,11 +741,10 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
 
         eccentricity, mean_per_ano = fix_eccentric_parameters_for_injections(
             inj)
-        try:
-            if inj['approximant'] in fd_det:
-                inj.f_lower = f_l
-                logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
-
+        if inj['approximant'] in fd_det:
+            inj.f_lower = f_l
+            logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
+            try:
                 strain = get_td_det_waveform_from_fd_det(
                     inj,
                     delta_t=delta_t,
@@ -755,34 +754,49 @@ class CBCHDFInjectionSet(_HDFInjectionSet):
                     mean_per_ano=mean_per_ano,
                     ifos=detector_name,
                     **self.extra_args)[detector_name]
-                strain /= distance_scale
-            else:
-                # compute the waveform time series
-                ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
-                f_l = fix_SEOBNRv4_f22_start(inj,
-                                             approximant=inj['approximant'],
-                                             f_l=f_l)
-                inj.f_lower = f_l
-                logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
+            except Exception as e:
+                logging.info(
+                    f"FAILURE: Failed to generate injection with error {e}")
+                logging.info(f"Injection parameters are {inj}")
+                print(
+                    f"FAILURE: Failed to generate injection with error {e}")
+                print(f"Injection parameters are {inj}")
+                return None
 
+            strain /= distance_scale
+
+        else:
+            # compute the waveform time series
+            ## For now, we fix f_ref = f_lower as SEOB models treat f_lower = f_ref
+            f_l = fix_SEOBNRv4_f22_start(inj,
+                                            approximant=inj['approximant'],
+                                            f_l=f_l)
+            inj.f_lower = f_l
+            logging.info("FLOW: using inj-f-lower = {:.2f}".format(f_l))
+
+            try:
                 hp, hc = get_td_waveform(inj,
                                          delta_t=delta_t,
                                          f_lower=f_l,
                                          eccentricity=eccentricity,
                                          mean_per_ano=mean_per_ano,
                                          **self.extra_args)
-                strain = projector(detector_name,
-                                   inj,
-                                   hp,
-                                   hc,
-                                   distance_scale=distance_scale)
-            return strain
+            except Exception as e:
+                logging.info(
+                    f"FAILURE: Failed to generate injection with error {e}")
+                logging.info(f"Injection parameters are {inj}")
+                print(
+                    f"FAILURE: Failed to generate injection with error {e}")
+                print(f"Injection parameters are {inj}")
+                return None
 
-        except Exception as e:
-            logging.info(
-                f"FAILURE: Failed to generate injection with error {e}")
-            logging.info(f"Injection parameters are {inj}")
-            return None
+            strain = projector(detector_name,
+                                inj,
+                                hp,
+                                hc,
+                                distance_scale=distance_scale)
+
+            return strain
 
     def end_times(self):
         """Return the end times of all injections"""
