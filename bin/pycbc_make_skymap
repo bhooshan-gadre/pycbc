@@ -76,7 +76,8 @@ def default_channel_name(time, ifo):
             return ifo + ':DCS-CALIB_STRAIN_CLEAN_SUB60HZ_C01'
     raise ValueError('Detector {} not supported at time {}'.format(ifo, time))
 
-def main(trig_time, mass1, mass2, spin1z, spin2z, f_low, f_upper, sample_rate,
+def main(trig_time, mass1, mass2, spin1z, spin2z, eccentricity, mean_per_ano,
+         f_low, f_upper, sample_rate,
          ifar, ifos, thresh_SNR, ligolw_skymap_output='.',
          ligolw_event_output=None, snr_series_duration=0.1465,
          frame_types=None, channel_names=None,
@@ -197,6 +198,8 @@ def main(trig_time, mass1, mass2, spin1z, spin2z, f_low, f_upper, sample_rate,
         "--mass2", str(mass2),
         "--spin1z", str(spin1z),
         "--spin2z", str(spin2z),
+        "--eccentricity", str(eccentricity),
+        "--mean-per-ano", str(mean_per_ano),
         "--low-frequency-cutoff", str(f_low),
         "--gps-start-time", str(gps_start_time),
         "--gps-end-time", str(gps_end_time),
@@ -422,7 +425,9 @@ def main(trig_time, mass1, mass2, spin1z, spin2z, f_low, f_upper, sample_rate,
         mass1=mass1,
         mass2=mass2,
         spin1z=spin1z,
-        spin2z=spin2z)
+        spin2z=spin2z,
+        eccentricity=eccentricity,
+        mean_per_ano=mean_per_ano)
     bs_approximant = waveform.bank.parse_approximant_arg(approximant, row)[0]
 
     # BAYESTAR uses TaylorF2 instead of SPAtmplt
@@ -502,6 +507,8 @@ if __name__ == '__main__':
     parser.add_argument('--mass2', type=float, required=True)
     parser.add_argument('--spin1z', type=float, required=True)
     parser.add_argument('--spin2z', type=float, required=True)
+    parser.add_argument('--eccentricity', type=float, default=0.0)
+    parser.add_argument('--mean-per-ano', type=float, default=0.0)
     parser.add_argument('--approximant', type=str, nargs='+',
                         default=["SPAtmplt:mtotal<4", "SEOBNRv4_ROM:else"])
     parser.add_argument('--f-low', type=float,
@@ -554,7 +561,7 @@ if __name__ == '__main__':
                              'H1:/path/to/frame/file L1:/path/to/frame/file')
     parser.add_argument('--injection-file', type=str,
                         help='Optional path to an injection file.')
-    parser.add_argument('--fake-strain', type=str, 
+    parser.add_argument('--fake-strain', type=str,
                         action=MultiDetOptionAction, metavar="IFO:FAKE_STRAIN",
                         help="The set of fake-strains for each detector")
     parser.add_argument('--fake-strain-seed', type=int,
@@ -572,8 +579,8 @@ if __name__ == '__main__':
     chan_name_dict = {f.split(':')[0]: f for f in opt.channel_name} \
             if opt.channel_name is not None else None
 
-    main(opt.trig_time, opt.mass1, opt.mass2,
-         opt.spin1z, opt.spin2z, opt.f_low, opt.f_upper, opt.sample_rate,
+    main(opt.trig_time, opt.mass1, opt.mass2, opt.spin1z, opt.spin2z,
+         opt.eccentricity, opt.mean_per_ano, opt.f_low, opt.f_upper, opt.sample_rate,
          opt.ifar, opt.ifos, opt.thresh_SNR, opt.ligolw_skymap_output,
          opt.ligolw_event_output,
          frame_types=frame_type_dict, channel_names=chan_name_dict,
@@ -582,6 +589,6 @@ if __name__ == '__main__':
          custom_frame_files=opt.custom_frame_file,
          approximant=opt.approximant, detector_state=opt.detector_state,
          segment_source=opt.segment_source, segment_server=opt.segment_server,
-         veto_definer=opt.veto_definer, injection_file=opt.injection_file, 
+         veto_definer=opt.veto_definer, injection_file=opt.injection_file,
          fake_strain=opt.fake_strain, fake_strain_seed=opt.fake_strain_seed,
          rescale_loglikelihood=opt.rescale_loglikelihood)
