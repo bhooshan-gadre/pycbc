@@ -95,12 +95,12 @@ def main(trig_time, mass1, mass2, spin1z, spin2z, f_low, f_upper, sample_rate,
          gracedb_server=None, test_event=True,
          custom_frame_files=None, approximant=None, detector_state=None,
          veto_definer=None, injection_file=None, fake_strain=None, fake_strain_from_file=None,
-         fake_strain_seed=None, rescale_loglikelihood=None):
+         fake_strain_seed=None, rescale_loglikelihood=None, tmpdir=None):
 
     if not test_event and not gracedb_server:
         raise RuntimeError('a GraceDB URL must be specified if not a test event.')
 
-    tmpdir = tempfile.mkdtemp()
+    tmpdir = tempfile.mkdtemp() if not tmpdir else os.makedirs(tmpdir, exist_ok=True)
 
     if len(trig_time) == 1 and ':' not in trig_time[0]:
         # single approximate time given
@@ -493,12 +493,13 @@ def main(trig_time, mass1, mass2, spin1z, spin2z, f_low, f_upper, sample_rate,
 
     if ligolw_event_output:
         shutil.move(ligolw_file_path, ligolw_event_output)
-    shutil.rmtree(tmpdir)
+    # shutil.rmtree(tmpdir)
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description=__doc__)
     pycbc.add_common_pycbc_options(parser)
+    parser.add_argument("--temp_dir", default=None, help="just to keep all the data to be used later")
     # note that I am not using a MultiDetOptionAction for --trig-time as I
     # explicitly want to handle cases like `--trig-time 1234` and
     # `--trig-time H1:1234 L1:1234` in different ways
@@ -604,4 +605,4 @@ if __name__ == '__main__':
          segment_source=opt.segment_source, segment_server=opt.segment_server,
          veto_definer=opt.veto_definer, injection_file=opt.injection_file, 
          fake_strain=opt.fake_strain, fake_strain_from_file=opt.fake_strain_from_file, fake_strain_seed=opt.fake_strain_seed,
-         rescale_loglikelihood=opt.rescale_loglikelihood)
+         rescale_loglikelihood=opt.rescale_loglikelihood, opt.temp_dir)
