@@ -3,9 +3,9 @@ set -e
 # generate an injection file using the PyCBC Live example
 ../live/generate_injections.py
 
-pycbc_make_skymap \
-  --trig-time 1272790260 \
+../../bin/pycbc_make_skymap \
   --temp-dir 1272790260_all_data \
+  --trig-time 1272790260 \
   --fake-strain \
   H1:aLIGOMidLowSensitivityP1200087 \
   L1:aLIGOMidLowSensitivityP1200087 \

@@ -95,12 +95,16 @@ def main(trig_time, mass1, mass2, spin1z, spin2z, f_low, f_upper, sample_rate,
          gracedb_server=None, test_event=True,
          custom_frame_files=None, approximant=None, detector_state=None,
          veto_definer=None, injection_file=None, fake_strain=None, fake_strain_from_file=None,
-         fake_strain_seed=None, rescale_loglikelihood=None, tmpdir=None):
+         fake_strain_seed=None, rescale_loglikelihood=None, temp_dir=None):
 
     if not test_event and not gracedb_server:
         raise RuntimeError('a GraceDB URL must be specified if not a test event.')
 
-    tmpdir = tempfile.mkdtemp() if not tmpdir else os.makedirs(tmpdir, exist_ok=True)
+    if temp_dir:
+        os.makedirs(temp_dir, exist_ok=True)
+        tmpdir = temp_dir
+    else:
+        tmpdir = tempfile.mkdtemp()
 
     if len(trig_time) == 1 and ':' not in trig_time[0]:
         # single approximate time given
@@ -499,7 +503,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description=__doc__)
     pycbc.add_common_pycbc_options(parser)
-    parser.add_argument("--temp_dir", default=None, help="just to keep all the data to be used later")
+    parser.add_argument("--temp-dir", type=str, default=None, help="just to keep all the data to be used later")
     # note that I am not using a MultiDetOptionAction for --trig-time as I
     # explicitly want to handle cases like `--trig-time 1234` and
     # `--trig-time H1:1234 L1:1234` in different ways
@@ -572,10 +576,10 @@ if __name__ == '__main__':
                              'H1:/path/to/frame/file L1:/path/to/frame/file')
     parser.add_argument('--injection-file', type=str,
                         help='Optional path to an injection file.')
-    parser.add_argument('--fake-strain', type=str, 
+    parser.add_argument('--fake-strain', type=str,
                         action=MultiDetOptionAction, metavar="IFO:FAKE_STRAIN",
                         help="The set of fake-strains for each detector")
-    parser.add_argument('--fake-strain-from-file', type=str, 
+    parser.add_argument('--fake-strain-from-file', type=str,
                         action=MultiDetOptionAction, metavar="IFO:FAKE_STRAIN_FROM_FILE",
                         help="The set of fake-strains for each detector from files")
     parser.add_argument('--fake-strain-seed', type=int,
@@ -603,6 +607,6 @@ if __name__ == '__main__':
          custom_frame_files=opt.custom_frame_file,
          approximant=opt.approximant, detector_state=opt.detector_state,
          segment_source=opt.segment_source, segment_server=opt.segment_server,
-         veto_definer=opt.veto_definer, injection_file=opt.injection_file, 
+         veto_definer=opt.veto_definer, injection_file=opt.injection_file,
          fake_strain=opt.fake_strain, fake_strain_from_file=opt.fake_strain_from_file, fake_strain_seed=opt.fake_strain_seed,
-         rescale_loglikelihood=opt.rescale_loglikelihood, opt.temp_dir)
+         rescale_loglikelihood=opt.rescale_loglikelihood, temp_dir=opt.temp_dir)
