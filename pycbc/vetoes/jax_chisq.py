@@ -6,10 +6,14 @@ sum ``v[j] * exp(2 * pi * i * shift * j / slen)`` with ``slen = len(corr)``
 
     (sum_bins |acc|^2 * n_bins - |snr|^2) * snr_norm**2
 
-Sine-Gaussian chi-squared follows ``SingleDetSGChisq.values``. Tiles come
-from ``pycbc.waveform.sinegauss.fd_sine_gaussian``. The time shift is a
-multiply by ``exp(-2 * pi * i * dt * k * delta_f)``.
+The sum over bins is one batched kernel for every row of ``corr``. Sine-Gaussian
+chi-squared follows ``SingleDetSGChisq.values``. Tiles come from
+``pycbc.waveform.sinegauss.fd_sine_gaussian``. The time shift is a multiply by
+``exp(-2 * pi * i * dt * k * delta_f)``, evaluated for every Q node and every
+row in one kernel.
 """
+
+import functools
 
 import numpy
 
@@ -23,8 +27,85 @@ _POINT_PI = 3.141592653
 
 
 def _import_jax():
+    import jax
     import jax.numpy as jnp
-    return jnp
+    return jax, jnp
+
+
+@functools.lru_cache(maxsize=None)
+def _power_kernel(n_edges):
+    """Shift-sum kernel specialized on the (static) number of bin edges."""
+    jax, jnp = _import_jax()
+    n_edges = int(n_edges)
+
+    @jax.jit
+    def kernel(q, shifts, bins, snr, norms, num_bins):
+        # q (B, slen), shifts (B,), bins (B, E), snr (B,) complex,
+        # norms (B,), num_bins (B,). Empty bins (end <= start) add nothing.
+        # num_bins is the unpadded edge count minus one, matching len(bins)-1
+        # in power_chisq_at_points_from_precomputed.
+        rows, slen = q.shape
+        freq = jnp.arange(slen, dtype=jnp.float32)
+        phase = ((2.0 * _POINT_PI) * shifts[:, None] * freq[None, :]
+                 / jnp.float32(slen))
+        weighted = q * jnp.exp(1j * phase).astype(q.dtype)
+        prefix = jnp.cumsum(weighted, axis=-1)
+        acc = jnp.zeros((rows,), dtype=jnp.float32)
+        row = jnp.arange(rows)
+        for edge in range(n_edges - 1):
+            start = bins[:, edge]
+            end = bins[:, edge + 1]
+            valid = end > start
+            end_i = jnp.clip(end - 1, 0, slen - 1)
+            start_i = jnp.clip(start - 1, 0, slen - 1)
+            end_val = prefix[row, end_i]
+            start_val = prefix[row, start_i]
+            start_val = jnp.where(start > 0, start_val, 0)
+            piece = jnp.where(valid, end_val - start_val, 0)
+            acc = acc + (piece.real * piece.real + piece.imag * piece.imag)
+        power = acc * num_bins - (snr.real * snr.real + snr.imag * snr.imag)
+        return (power * (norms * norms)).astype(jnp.float32)
+
+    return kernel
+
+
+def power_chisq_batch(q, snr, norms, bins, shifts, num_bins):
+    """Batched shift-sum chi-squared for one row per template (or per index).
+
+    Parameters
+    ----------
+    q : array
+        Complex correlation, shape ``(batch, slen)``.
+    snr : array
+        Unnormalized complex SNR, shape ``(batch,)``.
+    norms : array
+        SNR normalization ``4 * delta_f / sqrt(sigmasq)``, shape ``(batch,)``.
+    bins : array
+        Integer bin edges, shape ``(batch, n_edges)``. Padded edges must
+        repeat the last real edge so those intervals are empty.
+    shifts : array
+        Peak index into the inverse FFT, shape ``(batch,)``.
+    num_bins : array
+        Real bin count ``len(edges) - 1`` before padding, shape ``(batch,)``.
+
+    Returns
+    -------
+    chisq : jax array
+        Float32 unnormalized chi-squared, shape ``(batch,)``. Stays on the
+        device of ``q``.
+    """
+    _jax, jnp = _import_jax()
+    q = jnp.asarray(q, dtype=jnp.complex64)
+    if q.ndim == 1:
+        q = q[None, :]
+    snr = jnp.asarray(snr, dtype=jnp.complex64).reshape(-1)
+    norms = jnp.asarray(norms, dtype=jnp.float32).reshape(-1)
+    bins = jnp.asarray(bins, dtype=jnp.int32)
+    if bins.ndim == 1:
+        bins = jnp.broadcast_to(bins, (q.shape[0], bins.shape[0]))
+    shifts = jnp.asarray(shifts, dtype=jnp.float32).reshape(-1)
+    num_bins = jnp.asarray(num_bins, dtype=jnp.float32).reshape(-1)
+    return _power_kernel(int(bins.shape[1]))(q, shifts, bins, snr, norms, num_bins)
 
 
 def power_chisq_at_points(corr, snr, snr_norm, bins, indices):
@@ -33,7 +114,8 @@ def power_chisq_at_points(corr, snr, snr_norm, bins, indices):
     Parameters
     ----------
     corr : array
-        Complex correlation, length N = (n_freq - 1) * 2.
+        Complex correlation, shape ``(slen,)`` or ``(batch, slen)``. A single
+        correlation is reused for every index.
     snr : array
         Unnormalized complex SNR at ``indices``.
     snr_norm : float
@@ -48,42 +130,23 @@ def power_chisq_at_points(corr, snr, snr_norm, bins, indices):
     chisq : ndarray
         Float32 unnormalized chi-squared, one value per index.
     """
-    jnp = _import_jax()
     corr = numpy.asarray(corr)
-    snr = numpy.asarray(snr, dtype=numpy.complex128)
+    snr = numpy.asarray(snr, dtype=numpy.complex64).reshape(-1)
     indices = numpy.asarray(indices, dtype=numpy.float64).reshape(-1)
-    bins = numpy.asarray(bins, dtype=numpy.int64)
+    bins = numpy.asarray(bins, dtype=numpy.int32).reshape(-1)
     if indices.size == 0:
         return numpy.zeros(0, dtype=numpy.float32)
-
-    slen = corr.shape[-1]
-    v = jnp.asarray(corr, dtype=jnp.complex64)
-    j = jnp.arange(slen, dtype=jnp.float32)
-    edges = jnp.asarray(bins)
-    num_bins = int(len(bins) - 1)
-    snr_norm = float(snr_norm)
-    out = numpy.empty(indices.size, dtype=numpy.float64)
-
-    for n, shift in enumerate(indices):
-        phase = (2.0 * _POINT_PI) * float(shift) * j / float(slen)
-        rot = jnp.exp(1j * phase)
-        weighted = v * rot
-        csum = jnp.cumsum(weighted)
-        acc = 0.0
-        for b in range(num_bins):
-            start = int(edges[b])
-            end = int(edges[b + 1])
-            if end <= start:
-                continue
-            # sum of weighted[start:end]
-            end_val = csum[end - 1]
-            start_val = csum[start - 1] if start > 0 else 0
-            piece = end_val - start_val
-            acc = acc + (piece.real ** 2 + piece.imag ** 2)
-        sn = snr[n]
-        power = float(acc) * num_bins - float((sn.conjugate() * sn).real)
-        out[n] = power * (snr_norm ** 2)
-    return out.astype(numpy.float32, copy=False)
+    if corr.ndim == 1:
+        q = numpy.repeat(corr[None, :], indices.size, axis=0)
+    elif corr.shape[0] == 1 and indices.size > 1:
+        q = numpy.repeat(corr, indices.size, axis=0)
+    else:
+        q = corr
+    num_bins = numpy.full(indices.size, bins.size - 1, dtype=numpy.float32)
+    norms = numpy.full(indices.size, float(snr_norm), dtype=numpy.float32)
+    bin_rows = numpy.repeat(bins[None, :], indices.size, axis=0)
+    raw = power_chisq_batch(q, snr, norms, bin_rows, indices, num_bins)
+    return numpy.asarray(raw, dtype=numpy.float32)
 
 
 def reduced_power_chisq(corr, snr, snr_norm, bins, indices):
@@ -93,7 +156,7 @@ def reduced_power_chisq(corr, snr, snr_norm, bins, indices):
     ``dof = 2 * num_bins - 2``.
     """
     raw = power_chisq_at_points(corr, snr, snr_norm, bins, indices)
-    num_bins = len(bins) - 1
+    num_bins = len(numpy.asarray(bins).reshape(-1)) - 1
     dof = int(num_bins * 2 - 2)
     if dof == 0:
         reduced = numpy.zeros(len(raw), dtype=numpy.float32)
@@ -103,86 +166,207 @@ def reduced_power_chisq(corr, snr, snr_norm, bins, indices):
     return reduced, dof_vec, raw
 
 
-def _time_shift(stilde, dt, delta_f):
-    """Multiply by ``exp(-2 * pi * i * dt * k * delta_f)``."""
-    jnp = _import_jax()
-    data = jnp.asarray(numpy.asarray(stilde), dtype=jnp.complex64)
-    k = jnp.arange(data.shape[0], dtype=jnp.float32)
-    phase = -2.0 * numpy.pi * float(dt) * k * float(delta_f)
-    shifted = data * jnp.exp(1j * phase)
-    return numpy.asarray(shifted)
+def reduced_from_raw(raw, num_bins):
+    """Reduced chi-squared ``raw / (2 * num_bins - 2)`` and the dof vector."""
+    raw = numpy.asarray(raw, dtype=numpy.float32)
+    num_bins = numpy.asarray(num_bins, dtype=numpy.int32).reshape(-1)
+    dof = (num_bins * 2 - 2).astype(numpy.int32)
+    reduced = numpy.zeros(raw.shape, dtype=numpy.float32)
+    ok = dof > 0
+    reduced[ok] = raw[ok] / dof[ok].astype(numpy.float32)
+    return reduced, dof.astype(numpy.uint32)
+
+
+@functools.lru_cache(maxsize=None)
+def _sg_kernel():
+    """Tile inner products for every row and every Q node."""
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(stilde, tiles, k_idx, gsigma, times, delta_f):
+        # stilde (F,), tiles (B, Q, K), k_idx (B, Q, K), gsigma (B, Q),
+        # times (B,). k_idx < 0 is padding. Phase matches
+        # apply_fseries_time_shift(stilde, -time).
+        freq = k_idx.astype(jnp.float32)
+        valid = (k_idx >= 0) & (k_idx < stilde.shape[0])
+        safe = jnp.clip(k_idx, 0, stilde.shape[0] - 1)
+        data = stilde[safe]
+        phase = (2.0 * jnp.pi) * times[:, None, None] * freq * jnp.float32(delta_f)
+        prod = tiles * data * jnp.exp(1j * phase).astype(tiles.dtype)
+        prod = jnp.where(valid, prod, 0)
+        gsnr = jnp.sum(prod, axis=-1)
+        node_ok = jnp.any(valid, axis=-1) & (gsigma > 0)
+        scale = jnp.where(node_ok, (4.0 * jnp.float32(delta_f)) / gsigma, 0)
+        gsnr = gsnr * scale
+        power = jnp.where(node_ok, gsnr.real * gsnr.real + gsnr.imag * gsnr.imag, 0)
+        dof = jnp.sum(node_ok, axis=-1).astype(jnp.float32) * jnp.float32(2)
+        total = jnp.sum(power, axis=-1)
+        chisq = jnp.where(dof > 0, total / dof, jnp.float32(1))
+        return chisq.astype(jnp.float32)
+
+    return kernel
+
+
+def sg_chisq_batch(stilde, tiles, k_idx, gsigma, times, delta_f):
+    """Batched sine-Gaussian chi-squared.
+
+    Returns the mean tile SNR squared, shape ``(batch,)``, on the device of
+    ``stilde``. A row with no valid Q nodes is 1.
+    """
+    _jax, jnp = _import_jax()
+    stilde = jnp.asarray(stilde, dtype=jnp.complex64)
+    tiles = jnp.asarray(tiles, dtype=jnp.complex64)
+    if tiles.ndim == 2:
+        tiles = tiles[None, :, :]
+    k_idx = jnp.asarray(k_idx, dtype=jnp.int32)
+    if k_idx.ndim == 2:
+        k_idx = k_idx[None, :, :]
+    gsigma = jnp.asarray(gsigma, dtype=jnp.float32)
+    if gsigma.ndim == 1:
+        gsigma = gsigma[None, :]
+    times = jnp.asarray(times, dtype=jnp.float32).reshape(-1)
+    delta_f = jnp.asarray(delta_f, dtype=jnp.float32)
+    return _sg_kernel()(stilde, tiles, k_idx, gsigma, times, delta_f)
+
+
+def _epoch(template):
+    epoch = template.epoch
+    if epoch is None:
+        return 0.0
+    return float(epoch)
+
+
+def prepare_sg_bundle(sg, templates, psd, stilde_length, stilde_delta_f, bin_edges):
+    """Cache sine-Gaussian tiles for one duration group and one PSD.
+
+    Parameters
+    ----------
+    bin_edges : sequence
+        One unpadded integer edge array per template. Entries may be None
+        when the template is not in the sine-Gaussian location map.
+
+    Returns
+    -------
+    bundle : dict
+        Numpy arrays ``tiles``, ``k_idx``, ``gsigma``, and ``compute``.
+        ``compute`` is false when the template hash is absent or a tile
+        would pass 0.9 Nyquist; those rows stay 1 in the live filter.
+    """
+    if not getattr(sg, 'do', False):
+        return None
+    nbatch = len(templates)
+    per_template = []
+    max_q = 1
+    max_k = 1
+    for template, edges in zip(templates, bin_edges):
+        tiles = _tiles_for_template(
+            sg, template, psd, stilde_length, stilde_delta_f, edges)
+        per_template.append(tiles)
+        if tiles and tiles != 'nyquist':
+            max_q = max(max_q, len(tiles))
+            max_k = max(max_k, max(len(tile[0]) for tile in tiles))
+    tiles = numpy.zeros((nbatch, max_q, max_k), dtype=numpy.complex64)
+    k_idx = numpy.full((nbatch, max_q, max_k), -1, dtype=numpy.int32)
+    gsigma = numpy.ones((nbatch, max_q), dtype=numpy.float32)
+    compute = numpy.zeros(nbatch, dtype=numpy.bool_)
+    for i, spec in enumerate(per_template):
+        if not spec or spec == 'nyquist':
+            continue
+        compute[i] = True
+        for q_i, (tile, kmin, _kmax, sigma_val, _df) in enumerate(spec):
+            width = len(tile)
+            tiles[i, q_i, :width] = tile
+            k_idx[i, q_i, :width] = numpy.arange(kmin, kmin + width, dtype=numpy.int32)
+            gsigma[i, q_i] = numpy.float32(sigma_val)
+    return {
+        'tiles': tiles,
+        'k_idx': k_idx,
+        'gsigma': gsigma,
+        'compute': compute,
+        'delta_f': float(templates[0].delta_f),
+    }
+
+
+def _tiles_for_template(sg, template, psd, stilde_length, stilde_delta_f, edges):
+    """Return tile slices, ``'nyquist'``, or None (chi-squared stays 1)."""
+    if template.params.template_hash not in sg.params:
+        return None
+    values = sg.params[template.params.template_hash].split(',')
+    if edges is None or len(edges) < 3:
+        return None
+    qwindow = 50
+    fstep = (int(edges[-2]) - int(edges[-3]))
+    fpeak = (int(edges[-2]) + fstep) * float(template.delta_f)
+    fstop = float(stilde_length) * float(stilde_delta_f) * 0.9
+    kmin_tmpl = int(template.f_lower / psd.delta_f)
+    tiles = []
+    for descr in values:
+        quality, offset = descr.split('-')
+        quality, offset = float(quality), float(offset)
+        fcen = fpeak + offset
+        flow = max(kmin_tmpl * float(template.delta_f), fcen - qwindow)
+        fhigh = fcen + qwindow
+        if fhigh > fstop:
+            return 'nyquist'
+        kmin = int(flow / template.delta_f)
+        kmax = int(fhigh / template.delta_f)
+        gtem = sinegauss.fd_sine_gaussian(
+            1.0, quality, fcen, flow,
+            len(template) * float(template.delta_f),
+            template.delta_f).astype(numpy.complex64)
+        gsigma = sigma(gtem, psd=psd,
+                       low_frequency_cutoff=flow,
+                       high_frequency_cutoff=fhigh)
+        tile = numpy.asarray(gtem[kmin:kmax], dtype=numpy.complex64)
+        tiles.append((tile, kmin, kmax, float(gsigma), float(gtem.delta_f)))
+    return tiles
+
+
+def sg_gate_mask(abs_snr, reduced, snr_threshold):
+    """True where newsnr is at least the sine-Gaussian activation threshold."""
+    nsnr = ranking.newsnr(numpy.asarray(abs_snr, dtype=numpy.float64),
+                          numpy.asarray(reduced, dtype=numpy.float64))
+    return numpy.asarray(nsnr) >= float(snr_threshold)
 
 
 def sg_chisq_values(sg, stilde, template, psd, snrv, snr_norm,
-                    bchisq, bchisq_dof, indices):
+                    bchisq, bchisq_dof, indices, bundle=None, bins=None):
     """Sine-Gaussian chi-squared, same control flow as ``SingleDetSGChisq``.
 
     Returns an array of ones when the template hash is not in the location
     map, when sine-Gaussian chi-squared is disabled, or when a tile would
-    extend above 0.9 Nyquist. Otherwise the mean tile SNR^2.
+    extend above 0.9 Nyquist. Otherwise the mean tile SNR^2. Indices that
+    pass the newsnr gate are evaluated together.
     """
     snrv = numpy.asarray(snrv)
     indices = numpy.asarray(indices)
     n = len(snrv)
     if not getattr(sg, 'do', False):
         return None
-    if template.params.template_hash not in sg.params:
+    if bins is None:
+        bins = sg.cached_chisq_bins(template, psd)
+    if bundle is None:
+        bundle = prepare_sg_bundle(
+            sg, [template], psd, len(stilde), stilde.delta_f, [numpy.asarray(bins)])
+    if template.params.template_hash not in sg.params or not bundle['compute'][0]:
         return numpy.ones(n, dtype=numpy.float32)
 
-    values = sg.params[template.params.template_hash].split(',')
-    bins = sg.cached_chisq_bins(template, psd)
-    chisq = numpy.ones(n, dtype=numpy.float64)
-    gtem = [None for _ in values]
+    chisq = numpy.ones(n, dtype=numpy.float32)
+    snr = numpy.abs(numpy.asarray(snrv) * float(snr_norm))
+    reduced = (numpy.asarray(bchisq, dtype=numpy.float64)
+               / numpy.asarray(bchisq_dof, dtype=numpy.float64))
+    active = numpy.flatnonzero(sg_gate_mask(snr, reduced, sg.snr_threshold))
+    if active.size == 0:
+        return chisq
 
-    for i, snrvi in enumerate(snrv):
-        snr = abs(snrvi * snr_norm)
-        reduced = float(bchisq[i]) / float(bchisq_dof[i])
-        nsnr = ranking.newsnr(snr, reduced)
-        if nsnr < sg.snr_threshold:
-            continue
-
-        ntime = (len(template) - 1) * 2
-        dt_sample = 1.0 / (ntime * template.delta_f)
-        kmin_tmpl = int(template.f_lower / psd.delta_f)
-        epoch = template.epoch
-        epoch = 0.0 if epoch is None else float(epoch)
-        time = epoch + dt_sample * float(indices[i])
-        stilde_shift = _time_shift(stilde, -time, stilde.delta_f)
-
-        qwindow = 50
-        fstep = (bins[-2] - bins[-3])
-        fpeak = (bins[-2] + fstep) * template.delta_f
-        fstop = len(stilde) * stilde.delta_f * 0.9
-
-        chisq[i] = 0.0
-        dof = 0
-        for idxx, descr in enumerate(values):
-            q, offset = descr.split('-')
-            q, offset = float(q), float(offset)
-            fcen = fpeak + offset
-            flow = max(kmin_tmpl * template.delta_f, fcen - qwindow)
-            fhigh = fcen + qwindow
-            if fhigh > fstop:
-                return numpy.ones(n, dtype=numpy.float32)
-
-            kmin = int(flow / template.delta_f)
-            kmax = int(fhigh / template.delta_f)
-            if gtem[idxx] is None:
-                gtem[idxx] = sinegauss.fd_sine_gaussian(
-                    1.0, q, fcen, flow,
-                    len(template) * template.delta_f,
-                    template.delta_f).astype(numpy.complex64)
-            gsigma = sigma(gtem[idxx], psd=psd,
-                           low_frequency_cutoff=flow,
-                           high_frequency_cutoff=fhigh)
-            tile = numpy.asarray(gtem[idxx][kmin:kmax], dtype=numpy.complex128)
-            data = numpy.asarray(stilde_shift[kmin:kmax], dtype=numpy.complex128)
-            gsnr = numpy.sum(tile * data)
-            gsnr *= 4.0 * float(gtem[idxx].delta_f) / float(gsigma)
-            chisq[i] += abs(gsnr) ** 2
-            dof += 2
-        if dof == 0:
-            chisq[i] = 1.0
-        else:
-            chisq[i] /= dof
-    return chisq.astype(numpy.float32, copy=False)
+    ntime = (len(template) - 1) * 2
+    dt_sample = 1.0 / (ntime * float(template.delta_f))
+    times = _epoch(template) + dt_sample * indices[active].astype(numpy.float64)
+    tiles = numpy.repeat(bundle['tiles'][:1], active.size, axis=0)
+    k_idx = numpy.repeat(bundle['k_idx'][:1], active.size, axis=0)
+    gsigma = numpy.repeat(bundle['gsigma'][:1], active.size, axis=0)
+    data = numpy.asarray(stilde, dtype=numpy.complex64)
+    values = sg_chisq_batch(
+        data, tiles, k_idx, gsigma, times.astype(numpy.float32), template.delta_f)
+    chisq[active] = numpy.asarray(values, dtype=numpy.float32)
+    return chisq

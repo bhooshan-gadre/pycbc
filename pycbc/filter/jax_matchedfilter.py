@@ -11,6 +11,7 @@ the frequency series the CPU bank produced for a 1e-4 SNR comparison, the
 filter uses that CPU series instead. The comparison is always logged.
 """
 
+import functools
 import logging
 
 import numpy
@@ -26,7 +27,13 @@ from pycbc.waveform.jax_phenom import (
     compare_phenomd_to_reference,
     phenomd_implementation,
 )
-from pycbc.vetoes.jax_chisq import reduced_power_chisq, sg_chisq_values
+from pycbc.vetoes.jax_chisq import (
+    power_chisq_batch,
+    prepare_sg_bundle,
+    reduced_from_raw,
+    sg_chisq_batch,
+    sg_gate_mask,
+)
 
 logger = logging.getLogger('pycbc.filter.jax_matchedfilter')
 
@@ -156,12 +163,75 @@ def resolve_filter_backend(args, rank, size):
     return backend
 
 
+def _q_and_unnormalized(h, s, q):
+    """Batched ``conj(h) * s`` and unnormalized ``ifft * N``.
+
+    ``q`` is zero except ``q[:, :nfreq] = conj(h) * s``. ``N`` is the time
+    length. Called from jitted surface code so the FFT stays on device.
+    """
+    _jax, jnp = _import_jax()
+    flen = h.shape[1]
+    ntime = q.shape[1]
+    q = q.at[:, :].set(jnp.complex64(0))
+    q = q.at[:, :flen].set(jnp.conj(h) * s[None, :])
+    unnorm = jnp.fft.ifft(q, axis=-1) * jnp.asarray(ntime, dtype=jnp.float32)
+    return q, unnorm.astype(jnp.complex64)
+
+
+@functools.lru_cache(maxsize=None)
+def _correlate_kernel():
+    """Unnormalized correlate used by the diagnostic helper."""
+    jax, _jnp = _import_jax()
+
+    @jax.jit(donate_argnums=(2,))
+    def kernel(h, s, q):
+        return _q_and_unnormalized(h, s, q)
+
+    return kernel
+
+
+@functools.lru_cache(maxsize=None)
+def _surface_kernel(valid_len):
+    """One compiled surface for a fixed valid-window length.
+
+    Input shapes select the duration group. ``valid_start`` is a traced
+    scalar, so a new 8 s block does not compile again. ``q`` and ``snr``
+    are donated and reused as the frequency product and the normalized
+    surface.
+    """
+    jax, jnp = _import_jax()
+    valid_len = int(valid_len)
+
+    @jax.jit(donate_argnums=(3, 4))
+    def kernel(h, s, norms, q, snr, valid_start):
+        q, unnorm = _q_and_unnormalized(h, s, q)
+        # ρ(t, φ, θ). The per-template norm is real and positive, so the
+        # peak index matches the unnormalized series. Chi-squared still
+        # uses the unnormalized sample, as the CPU veto does.
+        surface = snr.at[:, :].set(
+            (unnorm * norms[:, None]).astype(jnp.complex64))
+        start = (jnp.int32(0), valid_start)
+        window = (h.shape[0], valid_len)
+        segment = jax.lax.dynamic_slice(surface, start, window)
+        unnorm_seg = jax.lax.dynamic_slice(unnorm, start, window)
+        power = segment.real * segment.real + segment.imag * segment.imag
+        # First strict maximum of |ρ|^2, matching abs_arg_max.
+        local = jnp.argmax(power, axis=-1)
+        rows = jnp.arange(h.shape[0])
+        peak = segment[rows, local]
+        peak_unnorm = unnorm_seg[rows, local]
+        return q, surface, peak, peak_unnorm, local + valid_start, jnp.abs(peak)
+
+    return kernel
+
+
 def batched_correlate_ifft(series, stilde, device):
     """Unnormalized complex SNR from the live JAX correlate and IFFT.
 
-    Same operation as ``JaxLiveBatchMatchedFilter._correlate_and_peak``:
     ``q`` is zero except ``q[:, :nfreq] = conj(h) * s``, and the time series
-    is ``ifft(q) * N`` (FFTW backward convention).
+    is ``ifft(q) * N`` (FFTW backward convention). The live filter multiplies
+    by the per-template norm inside ``_surface_kernel`` and does not use
+    this helper.
 
     Parameters
     ----------
@@ -191,11 +261,104 @@ def batched_correlate_ifft(series, stilde, device):
     s = jax.device_put(s, device)
     nbatch, flen = h.shape
     ntime = (flen - 1) * 2
-    q = jnp.zeros((nbatch, ntime), dtype=jnp.complex64)
-    q = q.at[:, :flen].set(jnp.conj(h) * s[None, :])
-    snr_ts = jnp.fft.ifft(q, axis=-1) * jnp.asarray(ntime, dtype=jnp.float32)
-    snr_ts = snr_ts.astype(jnp.complex64)
-    return snr_ts, q
+    q = jax.device_put(jnp.zeros((nbatch, ntime), dtype=jnp.complex64), device)
+    return _correlate_kernel()(h, s, q)
+
+
+class _DurationGroup(object):
+    """Device templates, reused surface buffers, and PSD-keyed weights."""
+
+    def __init__(self, series, templates, device):
+        jax, jnp = _import_jax()
+        self.templates = templates
+        self.device = device
+        self.nbatch, self.flen = series.shape
+        self.ntime = (self.flen - 1) * 2
+        self.delta_f = float(templates[0].delta_f)
+        self.h = jax.device_put(jnp.asarray(series, dtype=jnp.complex64), device)
+        self.q = jax.device_put(
+            jnp.zeros((self.nbatch, self.ntime), dtype=jnp.complex64), device)
+        self.snr = jax.device_put(
+            jnp.zeros((self.nbatch, self.ntime), dtype=jnp.complex64), device)
+        self.psd_key = None
+        self.sigmasq = None
+        self.norms = None
+        self.bins = None
+        self.num_bins = None
+        self.sg = None
+        self.strain = None
+        epochs = numpy.array([
+            0.0 if template.epoch is None else float(template.epoch)
+            for template in templates], dtype=numpy.float32)
+        self.epochs = jax.device_put(jnp.asarray(epochs), device)
+
+    def ensure_psd(self, psd, stilde, power_chisq, sg_chisq):
+        """Recompute sigmasq, chi-squared edges, and tiles when the PSD changes."""
+        key = (id(psd), int(len(stilde)))
+        if key == self.psd_key and self.norms is not None:
+            return
+        jax, jnp = _import_jax()
+        sigmasq = numpy.empty(self.nbatch, dtype=numpy.float64)
+        edges = []
+        sg_edges = []
+        width = 1
+        for i, template in enumerate(self.templates):
+            sigmasq[i] = float(template.sigmasq(psd))
+            if power_chisq.do:
+                row = numpy.asarray(
+                    power_chisq.cached_chisq_bins(template, psd),
+                    dtype=numpy.int32)
+            else:
+                row = numpy.zeros(1, dtype=numpy.int32)
+            edges.append(row)
+            width = max(width, int(row.size))
+            if getattr(sg_chisq, 'do', False):
+                sg_edges.append(numpy.asarray(
+                    sg_chisq.cached_chisq_bins(template, psd),
+                    dtype=numpy.int32))
+            else:
+                sg_edges.append(None)
+        bins = numpy.zeros((self.nbatch, width), dtype=numpy.int32)
+        num_bins = numpy.zeros(self.nbatch, dtype=numpy.int32)
+        for i, row in enumerate(edges):
+            bins[i, :row.size] = row
+            if row.size < width:
+                bins[i, row.size:] = row[-1]
+            num_bins[i] = max(int(row.size) - 1, 0)
+        norms = (4.0 * self.delta_f / numpy.sqrt(sigmasq)).astype(numpy.float32)
+        self.sigmasq = sigmasq
+        self.num_bins = num_bins
+        self.bins = jax.device_put(jnp.asarray(bins), self.device)
+        self.norms = jax.device_put(jnp.asarray(norms), self.device)
+        self.num_bins_d = jax.device_put(jnp.asarray(num_bins, dtype=jnp.float32),
+                                         self.device)
+        bundle = None
+        if getattr(sg_chisq, 'do', False):
+            bundle = prepare_sg_bundle(
+                sg_chisq, self.templates, psd, len(stilde), stilde.delta_f,
+                sg_edges)
+        if bundle is None:
+            self.sg = None
+        else:
+            self.sg = {
+                'tiles': jax.device_put(jnp.asarray(bundle['tiles']), self.device),
+                'k_idx': jax.device_put(jnp.asarray(bundle['k_idx']), self.device),
+                'gsigma': jax.device_put(jnp.asarray(bundle['gsigma']), self.device),
+                'compute': bundle['compute'],
+                'delta_f': bundle['delta_f'],
+            }
+        self.psd_key = key
+
+    def set_strain(self, stilde):
+        """Place the overwhitened block on device, reusing the buffer."""
+        jax, jnp = _import_jax()
+        strain = numpy.asarray(stilde, dtype=numpy.complex64)
+        data = jnp.asarray(strain)
+        if self.strain is None or self.strain.shape != data.shape:
+            self.strain = jax.device_put(data, self.device)
+        else:
+            self.strain = self.strain.at[:].set(data)
+        return self.strain
 
 
 class JaxLiveBatchMatchedFilter(object):
@@ -230,6 +393,7 @@ class JaxLiveBatchMatchedFilter(object):
         self.tgroups = []
         self._series = []
         self._lengths = []
+        self._states = []
         offset = 0
         for count in self.chunks:
             count = int(count)
@@ -239,6 +403,7 @@ class JaxLiveBatchMatchedFilter(object):
             series = self._prepare_group(group)
             self._series.append(series)
             self._lengths.append((len(group[0]) - 1) * 2)
+            self._states.append(_DurationGroup(series, group, self.device))
 
         self._log_startup_summary()
 
@@ -405,97 +570,88 @@ class JaxLiveBatchMatchedFilter(object):
 
     def process_all(self):
         results = []
-        veto_info = []
+        links = []
         while 1:
-            result, veto = self._process_batch()
+            result, batch_links = self._process_batch()
             if result is False:
                 return False
             if result is None:
                 break
             results.append(result)
-            veto_info += veto
+            links.extend(batch_links)
 
         result = self.combine_results(results)
         if self.max_triggers_in_batch:
             sort = result['snr'].argsort()[::-1][:self.max_triggers_in_batch]
             for key in result:
                 result[key] = result[key][sort]
-            tmp = veto_info
-            veto_info = [tmp[i] for i in sort]
-        return self._process_vetoes(result, veto_info)
+            links = [links[i] for i in sort]
+        return self._process_vetoes(result, links)
 
-    def _correlate_and_peak(self, series, stilde, valid_start, valid_end):
-        """Batched ``conj(h) * s`` and unnormalized complex64 IFFT.
-
-        Only the first ``len(h)`` bins of the length-N buffer are written.
-        The transform is ``ifft(q) * N``, the FFTW backward convention.
-        """
+    def _evaluate_surface(self, state, valid_start, valid_len):
+        """Normalized ρ(t, φ, θ) and on-device peaks for one duration group."""
         jax, jnp = _import_jax()
-        snr_ts, q = batched_correlate_ifft(series, stilde, self.device)
-        segment = snr_ts[:, valid_start:valid_end]
-        power = segment.real * segment.real + segment.imag * segment.imag
-        # First index with a strictly larger modulus squared.
-        local = jnp.argmax(power, axis=-1)
-        rows = jnp.arange(snr_ts.shape[0])
-        snrv = segment[rows, local]
-        q_host = numpy.asarray(q, dtype=numpy.complex64)
-        local_host = numpy.asarray(local, dtype=numpy.int64)
-        snrv_host = numpy.asarray(snrv, dtype=numpy.complex64)
-        return q_host, local_host, snrv_host
+        kernel = _surface_kernel(int(valid_len))
+        strain = state.strain
+        if strain.shape[0] < state.flen:
+            raise ValueError(
+                "overwhitened data is shorter than the template "
+                "(%s < %s)" % (strain.shape[0], state.flen))
+        s = strain[:state.flen]
+        q, snr = state.q, state.snr
+        state.q = state.snr = None
+        start = jax.device_put(jnp.asarray(valid_start, dtype=jnp.int32), self.device)
+        q, snr, peak, peak_unnorm, index, abs_snr = kernel(
+            state.h, s, state.norms, q, snr, start)
+        state.q = q
+        state.snr = snr
+        state.peak = peak
+        state.peak_unnorm = peak_unnorm
+        state.index = index
+        state.abs_snr = abs_snr
+        return abs_snr
 
     def _process_batch(self):
         if self.block_id == len(self.tgroups):
             return None, None
 
         group = self.tgroups[self.block_id]
-        series = self._series[self.block_id]
+        state = self._states[self.block_id]
         psize = self._lengths[self.block_id]
         stilde = self.data.overwhitened_data(group[0].delta_f)
-        psd = stilde.psd
+        state.ensure_psd(stilde.psd, stilde, self.power_chisq, self.sg_chisq)
+        state.set_strain(stilde)
+        state.stilde = stilde
 
         valid_end = int(psize - self.data.trim_padding)
         valid_start = int(valid_end - self.data.blocksize * self.data.sample_rate)
-        q, local, snrv = self._correlate_and_peak(
-            series, stilde, valid_start, valid_end)
+        valid_len = int(valid_end - valid_start)
+        abs_snr = self._evaluate_surface(state, valid_start, valid_len)
         self.block_id += 1
 
-        ntmpl = len(group)
-        snr = numpy.zeros(ntmpl, dtype=numpy.complex64)
-        time = numpy.zeros(ntmpl, dtype=numpy.float64)
-        templates = numpy.zeros(ntmpl, dtype=numpy.uint64)
-        sigmasq = numpy.zeros(ntmpl, dtype=numpy.float32)
-        time[:] = self.data.start_time
+        above = numpy.asarray(abs_snr >= numpy.float32(self.snr_threshold))
+        rows = numpy.flatnonzero(above)
+        peak = numpy.asarray(state.peak[rows], dtype=numpy.complex64)
+        index = numpy.asarray(state.index[rows], dtype=numpy.int64)
+        if (self.snr_abort_threshold is not None and rows.size
+                and float(numpy.abs(peak).max()) > self.snr_abort_threshold):
+            logger.info("We are seeing some *really* high SNRs, let's "
+                        "assume they aren't signals and just give up")
+            return False, []
 
+        nkeep = int(rows.size)
+        time = numpy.full(nkeep, self.data.start_time, dtype=numpy.float64)
+        time += (index - valid_start) / float(self.data.sample_rate)
         result = {}
         tkeys = group[0].params.dtype.names
         for key in tkeys:
             result[key] = []
-        veto_info = []
-
-        i = 0
-        for j, htilde in enumerate(group):
-            if hasattr(htilde, 'time_offset') and 'time_offset' not in result:
-                result['time_offset'] = []
-
-            l = int(local[j]) + valid_start
-            sgm = htilde.sigmasq(psd)
-            norm = 4.0 * htilde.delta_f / (sgm ** 0.5)
-            snr_i = snrv[j]
-            s = abs(snr_i) * norm
-            if s < self.snr_threshold:
-                continue
-
-            time[i] += float(l - valid_start) / self.data.sample_rate
-            if self.snr_abort_threshold is not None and s > self.snr_abort_threshold:
-                logger.info("We are seeing some *really* high SNRs, let's "
-                            "assume they aren't signals and just give up")
-                return False, []
-
-            veto_info.append((numpy.array([snr_i], dtype=numpy.complex64),
-                              float(norm), l, htilde, stilde, q[j], sgm))
-            snr[i] = snr_i * norm
-            sigmasq[i] = sgm
-            templates[i] = htilde.id
+        if any(hasattr(template, 'time_offset') for template in group):
+            result['time_offset'] = []
+        links = []
+        for row in rows:
+            htilde = group[int(row)]
+            links.append((state, int(row)))
             if not hasattr(htilde, 'dict_params'):
                 htilde.dict_params = {}
                 for key in tkeys:
@@ -504,53 +660,75 @@ class JaxLiveBatchMatchedFilter(object):
                 result[key].append(htilde.dict_params[key])
             if hasattr(htilde, 'time_offset'):
                 result['time_offset'].append(htilde.time_offset)
-            i += 1
 
-        result['snr'] = abs(snr[0:i])
-        result['coa_phase'] = numpy.angle(snr[0:i])
-        result['end_time'] = time[0:i]
-        result['template_id'] = templates[0:i]
-        result['sigmasq'] = sigmasq[0:i]
+        result['snr'] = numpy.abs(peak)
+        result['coa_phase'] = numpy.angle(peak)
+        result['end_time'] = time
+        result['template_id'] = numpy.array(
+            [group[int(row)].id for row in rows], dtype=numpy.uint64)
+        result['sigmasq'] = numpy.asarray(
+            state.sigmasq[rows], dtype=numpy.float32)
         for key in tkeys:
             result[key] = numpy.array(result[key])
         if 'time_offset' in result:
             result['time_offset'] = numpy.array(result['time_offset'])
-        return result, veto_info
+        return result, links
 
-    def _process_vetoes(self, results, veto_info):
-        chisq = numpy.array(numpy.zeros(len(veto_info)), numpy.float32, ndmin=1)
-        dof = numpy.array(numpy.zeros(len(veto_info)), numpy.uint32, ndmin=1)
-        sg_chisq = numpy.array(numpy.zeros(len(veto_info)), numpy.float32, ndmin=1)
+    def _process_vetoes(self, results, links):
+        n = len(links)
+        chisq = numpy.zeros(n, dtype=numpy.float32)
+        dof = numpy.zeros(n, dtype=numpy.uint32)
+        sg_chisq = numpy.zeros(n, dtype=numpy.float32)
         results['chisq'] = chisq
         results['chisq_dof'] = dof
         results['sg_chisq'] = sg_chisq
+        if n == 0:
+            return results
 
-        keep = []
-        for i, (snrv, norm, l, htilde, stilde, corr, _sgm) in enumerate(veto_info):
+        grouped = {}
+        for out_i, (state, row) in enumerate(links):
+            grouped.setdefault(id(state), {'state': state, 'out': [], 'row': []})
+            grouped[id(state)]['out'].append(out_i)
+            grouped[id(state)]['row'].append(row)
+
+        for group in grouped.values():
+            state = group['state']
+            out = numpy.asarray(group['out'], dtype=numpy.int64)
+            row = numpy.asarray(group['row'], dtype=numpy.int32)
             if self.power_chisq.do:
-                bins = self.power_chisq.cached_chisq_bins(htilde, stilde.psd)
-                reduced, dof_vec, raw = reduced_power_chisq(
-                    corr, snrv, norm, bins, [l])
-                chisq[i] = reduced[0]
-                dof[i] = dof_vec[0]
-                c = raw
-                d = dof_vec
+                raw = power_chisq_batch(
+                    state.q, state.peak_unnorm, state.norms, state.bins,
+                    state.index, state.num_bins_d)
+                raw = numpy.asarray(raw[row], dtype=numpy.float32)
+                reduced, dof_vec = reduced_from_raw(raw, state.num_bins[row])
             else:
-                c = numpy.zeros(1, dtype=numpy.float32)
-                d = numpy.ones(1, dtype=numpy.uint32)
-
-            sgv = sg_chisq_values(self.sg_chisq, stilde, htilde, stilde.psd,
-                                  snrv, norm, c, d, [l])
-            if sgv is not None:
-                sg_chisq[i] = sgv[0]
-
-            if self.newsnr_threshold:
-                newsnr = ranking.newsnr(results['snr'][i], chisq[i])
-                if newsnr >= self.newsnr_threshold:
-                    keep.append(i)
+                raw = numpy.zeros(row.size, dtype=numpy.float32)
+                reduced = numpy.zeros(row.size, dtype=numpy.float32)
+                dof_vec = numpy.ones(row.size, dtype=numpy.uint32)
+            chisq[out] = reduced
+            dof[out] = dof_vec
+            if getattr(self.sg_chisq, 'do', False) and state.sg is not None:
+                sg_values = self._sg_for_group(state)
+                picked = numpy.asarray(sg_values[row], dtype=numpy.float32)
+                abs_snr = numpy.asarray(state.abs_snr[row], dtype=numpy.float64)
+                gate = sg_gate_mask(abs_snr, reduced, self.sg_chisq.snr_threshold)
+                use = state.sg['compute'][row] & gate
+                picked = numpy.where(use, picked, numpy.float32(1))
+                sg_chisq[out] = picked
 
         if self.newsnr_threshold:
-            keep = numpy.array(keep, dtype=numpy.uint32)
+            newsnr = ranking.newsnr(results['snr'], chisq)
+            keep = numpy.flatnonzero(newsnr >= self.newsnr_threshold).astype(numpy.uint32)
             for key in results:
                 results[key] = results[key][keep]
         return results
+
+    def _sg_for_group(self, state):
+        """Sine-Gaussian chi-squared for every template in one duration group."""
+        _jax, jnp = _import_jax()
+        dt = jnp.asarray(
+            1.0 / (state.ntime * state.delta_f), dtype=jnp.float32)
+        times = state.epochs + dt * state.index.astype(jnp.float32)
+        return sg_chisq_batch(
+            state.strain, state.sg['tiles'], state.sg['k_idx'],
+            state.sg['gsigma'], times, state.sg['delta_f'])
