@@ -33,7 +33,7 @@ def _import_jax():
 
 
 @functools.lru_cache(maxsize=None)
-def _power_kernel(n_edges):
+def _power_kernel(n_edges, ntime):
     """Shift-sum kernel specialized on the (static) number of bin edges."""
     jax, jnp = _import_jax()
     n_edges = int(n_edges)
@@ -44,32 +44,41 @@ def _power_kernel(n_edges):
         # norms (B,), num_bins (B,). Empty bins (end <= start) add nothing.
         # num_bins is the unpadded edge count minus one, matching len(bins)-1
         # in power_chisq_at_points_from_precomputed.
-        rows, slen = q.shape
-        freq = jnp.arange(slen, dtype=jnp.float32)
-        phase = ((2.0 * _POINT_PI) * shifts[:, None] * freq[None, :]
-                 / jnp.float32(slen))
-        weighted = q * jnp.exp(1j * phase).astype(q.dtype)
+        rows, support = q.shape
+        slen = ntime
+        # Phase and the prefix sum are float64. A float32 prefix of a
+        # 32 s spectrum subtracts two large partial sums, and the bin sum
+        # then misses the CPU shift-sum by more than the 1e-4 chi-squared
+        # gate. The CPU loop accumulates each bin from zero in float32
+        # after a double-precision angle, which matches this float64 sum.
+        freq = jnp.arange(support, dtype=jnp.float64)
+        phase = ((2.0 * _POINT_PI) * shifts.astype(jnp.float64)[:, None]
+                 * freq[None, :] / jnp.float64(slen))
+        weighted = q.astype(jnp.complex128) * jnp.exp(1j * phase)
         prefix = jnp.cumsum(weighted, axis=-1)
-        acc = jnp.zeros((rows,), dtype=jnp.float32)
+        acc = jnp.zeros((rows,), dtype=jnp.float64)
         row = jnp.arange(rows)
         for edge in range(n_edges - 1):
             start = bins[:, edge]
             end = bins[:, edge + 1]
             valid = end > start
-            end_i = jnp.clip(end - 1, 0, slen - 1)
-            start_i = jnp.clip(start - 1, 0, slen - 1)
+            end_i = jnp.clip(end - 1, 0, support - 1)
+            start_i = jnp.clip(start - 1, 0, support - 1)
             end_val = prefix[row, end_i]
             start_val = prefix[row, start_i]
             start_val = jnp.where(start > 0, start_val, 0)
             piece = jnp.where(valid, end_val - start_val, 0)
             acc = acc + (piece.real * piece.real + piece.imag * piece.imag)
-        power = acc * num_bins - (snr.real * snr.real + snr.imag * snr.imag)
-        return (power * (norms * norms)).astype(jnp.float32)
+        snr64 = snr.astype(jnp.complex128)
+        power = acc * num_bins.astype(jnp.float64) - (
+            snr64.real * snr64.real + snr64.imag * snr64.imag)
+        norms64 = norms.astype(jnp.float64)
+        return (power * (norms64 * norms64)).astype(jnp.float32)
 
     return kernel
 
 
-def power_chisq_batch(q, snr, norms, bins, shifts, num_bins):
+def power_chisq_batch(q, snr, norms, bins, shifts, num_bins, ntime=None):
     """Batched shift-sum chi-squared for one row per template (or per index).
 
     Parameters
@@ -87,6 +96,10 @@ def power_chisq_batch(q, snr, norms, bins, shifts, num_bins):
         Peak index into the inverse FFT, shape ``(batch,)``.
     num_bins : array
         Real bin count ``len(edges) - 1`` before padding, shape ``(batch,)``.
+    ntime : int, optional
+        Original inverse FFT length. Supply this when ``q`` contains only
+        the positive-frequency support; phase shifts still use the original
+        time length. All bin edges must lie within the supplied support.
 
     Returns
     -------
@@ -94,10 +107,13 @@ def power_chisq_batch(q, snr, norms, bins, shifts, num_bins):
         Float32 unnormalized chi-squared, shape ``(batch,)``. Stays on the
         device of ``q``.
     """
-    _jax, jnp = _import_jax()
+    jax, jnp = _import_jax()
     q = jnp.asarray(q, dtype=jnp.complex64)
     if q.ndim == 1:
         q = q[None, :]
+    ntime = int(q.shape[1] if ntime is None else ntime)
+    if ntime < q.shape[1]:
+        raise ValueError('ntime cannot be shorter than the correlation support')
     snr = jnp.asarray(snr, dtype=jnp.complex64).reshape(-1)
     norms = jnp.asarray(norms, dtype=jnp.float32).reshape(-1)
     bins = jnp.asarray(bins, dtype=jnp.int32)
@@ -105,7 +121,71 @@ def power_chisq_batch(q, snr, norms, bins, shifts, num_bins):
         bins = jnp.broadcast_to(bins, (q.shape[0], bins.shape[0]))
     shifts = jnp.asarray(shifts, dtype=jnp.float32).reshape(-1)
     num_bins = jnp.asarray(num_bins, dtype=jnp.float32).reshape(-1)
-    return _power_kernel(int(bins.shape[1]))(q, shifts, bins, snr, norms, num_bins)
+    # The live filter leaves x64 off. This sum needs float64 angles and a
+    # float64 prefix; the flag is restored when the context exits.
+    with jax.enable_x64(True):
+        return _power_kernel(int(bins.shape[1]), ntime)(
+            q, shifts, bins, snr, norms, num_bins)
+
+
+@functools.lru_cache(maxsize=None)
+def _selected_power_kernel(n_edges, support, ntime):
+    """Gather candidate rows and truncate zero frequencies inside one JIT."""
+    jax, _jnp = _import_jax()
+
+    @jax.jit
+    def kernel(q, snr, norms, bins, shifts, num_bins, rows):
+        return _power_kernel(n_edges, ntime)(
+            q[rows, :support], shifts[rows], bins[rows], snr[rows],
+            norms[rows], num_bins[rows])
+
+    return kernel
+
+
+def power_chisq_selected(q, snr, norms, bins, shifts, num_bins, rows, support):
+    """Veto only selected rows, without scanning the unused FFT half.
+
+    ``rows`` may repeat a candidate to pad a batch to a stable bucket size.
+    ``support`` is the largest chi-squared bin edge in the duration group.
+    The caller discards the padded outputs.
+    """
+    jax, jnp = _import_jax()
+    with jax.enable_x64(True):
+        return _selected_power_kernel(int(bins.shape[1]), int(support), q.shape[1])(
+            q, snr, norms, bins, shifts, num_bins,
+            jnp.asarray(rows, dtype=jnp.int32))
+
+
+@functools.lru_cache(maxsize=None)
+def _power_points_kernel(n_edges, support, ntime):
+    jax, _jnp = _import_jax()
+
+    @jax.jit
+    def kernel(q, norms, bins, num_bins, rows, indices, peaks):
+        selected_norms = norms[rows]
+        return _power_kernel(n_edges, ntime)(
+            q[rows, :support], indices, bins[rows], peaks / selected_norms,
+            selected_norms, num_bins[rows])
+
+    return kernel
+
+
+def power_chisq_candidate_points(q, norms, bins, num_bins, rows, indices,
+                                peaks, support):
+    """Power veto at arbitrary offline peaks, fusing all candidate gathers.
+
+    A template row can occur more than once, with a different time index
+    each time. ``peaks`` contains normalized complex SNR samples.
+    """
+    jax, jnp = _import_jax()
+    # Normalize in float32, as the surface is complex64. The accumulation
+    # inside _power_kernel retains float64 phase and prefix precision.
+    rows = jnp.asarray(rows, dtype=jnp.int32)
+    indices = jnp.asarray(indices, dtype=jnp.int32)
+    peaks = jnp.asarray(peaks, dtype=jnp.complex64)
+    with jax.enable_x64(True):
+        return _power_points_kernel(int(bins.shape[1]), int(support), q.shape[1])(
+            q, norms, bins, num_bins, rows, indices, peaks)
 
 
 def power_chisq_at_points(corr, snr, snr_norm, bins, indices):
@@ -191,8 +271,17 @@ def _sg_kernel():
         valid = (k_idx >= 0) & (k_idx < stilde.shape[0])
         safe = jnp.clip(k_idx, 0, stilde.shape[0] - 1)
         data = stilde[safe]
-        phase = (2.0 * jnp.pi) * times[:, None, None] * freq * jnp.float32(delta_f)
-        prod = tiles * data * jnp.exp(1j * phase).astype(tiles.dtype)
+        # Match utils_cpu.fstimeshift32's single-precision phase increment
+        # and phase reset every 100 bins. A single large FP32 angle loses
+        # enough precision to move SG vetoes at late peaks by ~1e-3.
+        phi = (2.0 * jnp.pi * times.astype(jnp.float64)
+               * delta_f.astype(jnp.float64)).astype(jnp.float32)
+        anchor = (k_idx // 100 * 100).astype(jnp.float32)
+        base = phi[:, None, None] * anchor
+        offset = phi[:, None, None] * (freq-anchor)
+        shift = (jnp.exp(1j * base) * jnp.exp(1j * offset)).astype(tiles.dtype)
+        shifted = data * shift
+        prod = tiles * shifted
         prod = jnp.where(valid, prod, 0)
         gsnr = jnp.sum(prod, axis=-1)
         node_ok = jnp.any(valid, axis=-1) & (gsigma > 0)
@@ -213,7 +302,7 @@ def sg_chisq_batch(stilde, tiles, k_idx, gsigma, times, delta_f):
     Returns the mean tile SNR squared, shape ``(batch,)``, on the device of
     ``stilde``. A row with no valid Q nodes is 1.
     """
-    _jax, jnp = _import_jax()
+    jax, jnp = _import_jax()
     stilde = jnp.asarray(stilde, dtype=jnp.complex64)
     tiles = jnp.asarray(tiles, dtype=jnp.complex64)
     if tiles.ndim == 2:
@@ -226,7 +315,54 @@ def sg_chisq_batch(stilde, tiles, k_idx, gsigma, times, delta_f):
         gsigma = gsigma[None, :]
     times = jnp.asarray(times, dtype=jnp.float32).reshape(-1)
     delta_f = jnp.asarray(delta_f, dtype=jnp.float32)
-    return _sg_kernel()(stilde, tiles, k_idx, gsigma, times, delta_f)
+    with jax.enable_x64(True):
+        return _sg_kernel()(stilde, tiles, k_idx, gsigma, times, delta_f)
+
+
+@functools.lru_cache(maxsize=None)
+def _selected_sg_kernel():
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(stilde, tiles, k_idx, gsigma, epochs, indices, rows, delta_f, dt):
+        times = epochs[rows] + dt * indices[rows].astype(jnp.float32)
+        return _sg_kernel()(
+            stilde, tiles[rows], k_idx[rows], gsigma[rows], times, delta_f)
+
+    return kernel
+
+
+def sg_chisq_selected(stilde, bundle, epochs, indices, rows, dt):
+    """Gather only activated candidates and evaluate their tiles in one JIT."""
+    jax, jnp = _import_jax()
+    with jax.enable_x64(True):
+        return _selected_sg_kernel()(
+            stilde, bundle['tiles'], bundle['k_idx'], bundle['gsigma'], epochs,
+            indices, jnp.asarray(rows, dtype=jnp.int32),
+            numpy.float32(bundle['delta_f']), numpy.float32(dt))
+
+
+@functools.lru_cache(maxsize=None)
+def _sg_points_kernel():
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(stilde, tiles, k_idx, gsigma, epochs, indices, rows, delta_f, dt):
+        times = epochs[rows] + dt * indices.astype(jnp.float32)
+        return _sg_kernel()(
+            stilde, tiles[rows], k_idx[rows], gsigma[rows], times, delta_f)
+
+    return kernel
+
+
+def sg_chisq_candidate_points(stilde, bundle, epochs, rows, indices, dt):
+    """Sine-Gaussian veto at arbitrary offline peaks in a single dispatch."""
+    jax, jnp = _import_jax()
+    with jax.enable_x64(True):
+        return _sg_points_kernel()(
+            stilde, bundle['tiles'], bundle['k_idx'], bundle['gsigma'], epochs,
+            jnp.asarray(indices, dtype=jnp.int32), jnp.asarray(rows, dtype=jnp.int32),
+            numpy.float32(bundle['delta_f']), numpy.float32(dt))
 
 
 def _epoch(template):

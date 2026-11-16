@@ -1,0 +1,6 @@
+# P100 is SM 6.0: CUDA 12 JAX supports it; CUDA 13 JAX does not.
+# Pin the JAX/ripple versions used by the CPU validation in this branch.
+jax[cuda12]==0.10.2
+ripplegw==0.5.1
+matplotlib>=3.8
+pytest>=8

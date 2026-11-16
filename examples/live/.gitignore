@@ -3,5 +3,6 @@ template_bank.hdf
 injections.hdf
 stat*.hdf
 output/
+diagnostics/cache/
 *.fits
 jax_parity/

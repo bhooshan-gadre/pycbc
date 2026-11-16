@@ -28,10 +28,11 @@ from pycbc.waveform.jax_phenom import (
     phenomd_implementation,
 )
 from pycbc.vetoes.jax_chisq import (
-    power_chisq_batch,
+    power_chisq_selected,
     prepare_sg_bundle,
     reduced_from_raw,
     sg_chisq_batch,
+    sg_chisq_selected,
     sg_gate_mask,
 )
 
@@ -225,6 +226,89 @@ def _surface_kernel(valid_len):
     return kernel
 
 
+@functools.lru_cache(maxsize=None)
+def _cpu_product_kernel(ntime):
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(h, s):
+        return jnp.pad(jnp.conj(h) * s[None, :],
+                       ((0, 0), (0, ntime - h.shape[1])))
+
+    return kernel
+
+
+@functools.lru_cache(maxsize=None)
+def _cpu_ifft_kernel():
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(q):
+        return (jnp.fft.ifft(q, axis=-1)
+                * jnp.float32(q.shape[1])).astype(jnp.complex64)
+
+    return kernel
+
+
+@functools.lru_cache(maxsize=None)
+def _peak_kernel(valid_len):
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(unnorm, norms, valid_start):
+        part = jax.lax.dynamic_slice(
+            unnorm, (jnp.int32(0), valid_start), (unnorm.shape[0], valid_len))
+        power = part.real * part.real + part.imag * part.imag
+        # Positive normalization does not change the maximizing time. This
+        # follows the CPU filter, which finds its maximum before normalizing.
+        local = jnp.argmax(power, axis=-1)
+        raw = part[jnp.arange(unnorm.shape[0]), local]
+        peak = raw * norms
+        return peak, raw, local + valid_start, jnp.abs(peak)
+
+    return kernel
+
+
+@functools.lru_cache(maxsize=None)
+def _normalize_surface_kernel():
+    jax, _jnp = _import_jax()
+
+    @jax.jit
+    def kernel(unnorm, norms):
+        return unnorm * norms[:, None]
+
+    return kernel
+
+
+@functools.lru_cache(maxsize=None)
+def _normalized_window_kernel(valid_len, already_normalized):
+    jax, jnp = _import_jax()
+
+    @jax.jit
+    def kernel(series, norms, valid_start):
+        window = jax.lax.dynamic_slice(
+            series, (jnp.int32(0), valid_start), (series.shape[0], valid_len))
+        return window if already_normalized else window * norms[:, None]
+
+    return kernel
+
+
+def _cpu_surface(h, s, norms, valid_start, valid_len):
+    """Separate JIT stages for the CPU runtime's FFT scheduling.
+
+    On the tested XLA CPU runtime, a combined product/FFT returning both
+    arrays costs substantially more than the same stages dispatched
+    separately. Keep this CPU-specific; GPU execution uses the fused kernel.
+    Only normalize the retained peaks here. Diagnostics normalize the full
+    surface lazily when ``state.snr`` is requested.
+    """
+    ntime = (h.shape[1] - 1) * 2
+    q = _cpu_product_kernel(ntime)(h, s)
+    unnorm = _cpu_ifft_kernel()(q)
+    peaks = _peak_kernel(int(valid_len))(unnorm, norms, valid_start)
+    return (q, unnorm, *peaks)
+
+
 def batched_correlate_ifft(series, stilde, device):
     """Unnormalized complex SNR from the live JAX correlate and IFFT.
 
@@ -280,6 +364,7 @@ class _DurationGroup(object):
             jnp.zeros((self.nbatch, self.ntime), dtype=jnp.complex64), device)
         self.snr = jax.device_put(
             jnp.zeros((self.nbatch, self.ntime), dtype=jnp.complex64), device)
+        self.unnorm = None
         self.psd_key = None
         self.sigmasq = None
         self.norms = None
@@ -291,6 +376,31 @@ class _DurationGroup(object):
             0.0 if template.epoch is None else float(template.epoch)
             for template in templates], dtype=numpy.float32)
         self.epochs = jax.device_put(jnp.asarray(epochs), device)
+
+    @property
+    def snr(self):
+        """Normalized surface, materialized only for diagnostics/offline use."""
+        if self._snr is None and self.unnorm is not None:
+            self._snr = _normalize_surface_kernel()(self.unnorm, self.norms)
+            # Once the full surface is requested, retain that representation
+            # rather than both full-size time arrays. Peak vetoes retain their
+            # raw scalar samples separately.
+            self.unnorm = None
+        return self._snr
+
+    @snr.setter
+    def snr(self, value):
+        self._snr = value
+
+    def snr_window(self, start, length):
+        """Normalize/copy only the valid window needed by offline clustering."""
+        start, length = int(start), int(length)
+        if start < 0 or length <= 0 or start + length > self.ntime:
+            raise ValueError('SNR window is outside the filter buffer')
+        normalized = self.unnorm is None
+        series = self._snr if normalized else self.unnorm
+        return _normalized_window_kernel(length, normalized)(
+            series, self.norms, numpy.int32(start))
 
     def ensure_psd(self, psd, stilde, power_chisq, sg_chisq):
         """Recompute sigmasq, chi-squared edges, and tiles when the PSD changes."""
@@ -328,6 +438,7 @@ class _DurationGroup(object):
         norms = (4.0 * self.delta_f / numpy.sqrt(sigmasq)).astype(numpy.float32)
         self.sigmasq = sigmasq
         self.num_bins = num_bins
+        self.power_stop = max(1, min(self.flen, int(bins.max())))
         self.bins = jax.device_put(jnp.asarray(bins), self.device)
         self.norms = jax.device_put(jnp.asarray(norms), self.device)
         self.num_bins_d = jax.device_put(jnp.asarray(num_bins, dtype=jnp.float32),
@@ -350,14 +461,10 @@ class _DurationGroup(object):
         self.psd_key = key
 
     def set_strain(self, stilde):
-        """Place the overwhitened block on device, reusing the buffer."""
-        jax, jnp = _import_jax()
+        """Transfer this block once, without an additional scatter copy."""
+        jax, _jnp = _import_jax()
         strain = numpy.asarray(stilde, dtype=numpy.complex64)
-        data = jnp.asarray(strain)
-        if self.strain is None or self.strain.shape != data.shape:
-            self.strain = jax.device_put(data, self.device)
-        else:
-            self.strain = self.strain.at[:].set(data)
+        self.strain = jax.device_put(strain, self.device)
         return self.strain
 
 
@@ -557,6 +664,9 @@ class JaxLiveBatchMatchedFilter(object):
     def set_data(self, data):
         self.data = data
         self.block_id = 0
+        # Several chunks can share the same FFT grid. Upload that strain once
+        # per block, including serial (one-template-per-chunk) execution.
+        self._strain_cache = {}
 
     def combine_results(self, results):
         result = {}
@@ -591,20 +701,25 @@ class JaxLiveBatchMatchedFilter(object):
     def _evaluate_surface(self, state, valid_start, valid_len):
         """Normalized ρ(t, φ, θ) and on-device peaks for one duration group."""
         jax, jnp = _import_jax()
-        kernel = _surface_kernel(int(valid_len))
         strain = state.strain
         if strain.shape[0] < state.flen:
             raise ValueError(
                 "overwhitened data is shorter than the template "
                 "(%s < %s)" % (strain.shape[0], state.flen))
         s = strain[:state.flen]
-        q, snr = state.q, state.snr
-        state.q = state.snr = None
-        start = jax.device_put(jnp.asarray(valid_start, dtype=jnp.int32), self.device)
-        q, snr, peak, peak_unnorm, index, abs_snr = kernel(
-            state.h, s, state.norms, q, snr, start)
-        state.q = q
-        state.snr = snr
+        start = numpy.int32(valid_start)
+        if self.device.platform == 'cpu':
+            state.q, state.unnorm, peak, peak_unnorm, index, abs_snr = _cpu_surface(
+                state.h, s, state.norms, start, int(valid_len))
+            state.snr = None
+        else:
+            kernel = _surface_kernel(int(valid_len))
+            q, snr = state.q, state.snr
+            state.q = state.snr = None
+            q, snr, peak, peak_unnorm, index, abs_snr = kernel(
+                state.h, s, state.norms, q, snr, start)
+            state.q = q
+            state.snr = snr
         state.peak = peak
         state.peak_unnorm = peak_unnorm
         state.index = index
@@ -618,9 +733,12 @@ class JaxLiveBatchMatchedFilter(object):
         group = self.tgroups[self.block_id]
         state = self._states[self.block_id]
         psize = self._lengths[self.block_id]
-        stilde = self.data.overwhitened_data(group[0].delta_f)
+        delta_f = group[0].delta_f
+        if delta_f not in self._strain_cache:
+            stilde = self.data.overwhitened_data(delta_f)
+            self._strain_cache[delta_f] = (stilde, state.set_strain(stilde))
+        stilde, state.strain = self._strain_cache[delta_f]
         state.ensure_psd(stilde.psd, stilde, self.power_chisq, self.sg_chisq)
-        state.set_strain(stilde)
         state.stilde = stilde
 
         valid_end = int(psize - self.data.trim_padding)
@@ -629,10 +747,16 @@ class JaxLiveBatchMatchedFilter(object):
         abs_snr = self._evaluate_surface(state, valid_start, valid_len)
         self.block_id += 1
 
-        above = numpy.asarray(abs_snr >= numpy.float32(self.snr_threshold))
+        jax, _jnp = _import_jax()
+        # A group has few peaks but a large surface. Transfer just the peak
+        # vectors together; avoid separate device gathers and synchronizations.
+        host_peak, host_index, host_abs = jax.device_get(
+            (state.peak, state.index, abs_snr))
+        state.host_abs_snr = host_abs
+        above = host_abs >= numpy.float32(self.snr_threshold)
         rows = numpy.flatnonzero(above)
-        peak = numpy.asarray(state.peak[rows], dtype=numpy.complex64)
-        index = numpy.asarray(state.index[rows], dtype=numpy.int64)
+        peak = numpy.asarray(host_peak[rows], dtype=numpy.complex64)
+        index = numpy.asarray(host_index[rows], dtype=numpy.int64)
         if (self.snr_abort_threshold is not None and rows.size
                 and float(numpy.abs(peak).max()) > self.snr_abort_threshold):
             logger.info("We are seeing some *really* high SNRs, let's "
@@ -696,10 +820,11 @@ class JaxLiveBatchMatchedFilter(object):
             out = numpy.asarray(group['out'], dtype=numpy.int64)
             row = numpy.asarray(group['row'], dtype=numpy.int32)
             if self.power_chisq.do:
-                raw = power_chisq_batch(
+                selected = _bucket_rows(row, state.nbatch)
+                raw = power_chisq_selected(
                     state.q, state.peak_unnorm, state.norms, state.bins,
-                    state.index, state.num_bins_d)
-                raw = numpy.asarray(raw[row], dtype=numpy.float32)
+                    state.index, state.num_bins_d, selected, state.power_stop)
+                raw = numpy.asarray(raw, dtype=numpy.float32)[:row.size]
                 reduced, dof_vec = reduced_from_raw(raw, state.num_bins[row])
             else:
                 raw = numpy.zeros(row.size, dtype=numpy.float32)
@@ -708,12 +833,15 @@ class JaxLiveBatchMatchedFilter(object):
             chisq[out] = reduced
             dof[out] = dof_vec
             if getattr(self.sg_chisq, 'do', False) and state.sg is not None:
-                sg_values = self._sg_for_group(state)
-                picked = numpy.asarray(sg_values[row], dtype=numpy.float32)
-                abs_snr = numpy.asarray(state.abs_snr[row], dtype=numpy.float64)
+                abs_snr = state.host_abs_snr[row]
                 gate = sg_gate_mask(abs_snr, reduced, self.sg_chisq.snr_threshold)
                 use = state.sg['compute'][row] & gate
-                picked = numpy.where(use, picked, numpy.float32(1))
+                picked = numpy.ones(row.size, dtype=numpy.float32)
+                active = numpy.flatnonzero(use)
+                if active.size:
+                    selected = _bucket_rows(row[active], state.nbatch)
+                    sg_values = self._sg_for_group(state, selected)
+                    picked[active] = numpy.asarray(sg_values)[:active.size]
                 sg_chisq[out] = picked
 
         if self.newsnr_threshold:
@@ -723,8 +851,12 @@ class JaxLiveBatchMatchedFilter(object):
                 results[key] = results[key][keep]
         return results
 
-    def _sg_for_group(self, state):
-        """Sine-Gaussian chi-squared for every template in one duration group."""
+    def _sg_for_group(self, state, rows=None):
+        """Sine-Gaussian chi-squared for a group or selected candidate rows."""
+        if rows is not None:
+            return sg_chisq_selected(
+                state.strain, state.sg, state.epochs, state.index, rows,
+                1.0 / (state.ntime * state.delta_f))
         _jax, jnp = _import_jax()
         dt = jnp.asarray(
             1.0 / (state.ntime * state.delta_f), dtype=jnp.float32)
@@ -732,3 +864,13 @@ class JaxLiveBatchMatchedFilter(object):
         return sg_chisq_batch(
             state.strain, state.sg['tiles'], state.sg['k_idx'],
             state.sg['gsigma'], times, state.sg['delta_f'])
+
+
+def _bucket_rows(rows, maximum):
+    """Pad candidate rows to powers of two to limit JIT shape variants.
+
+    Duplicate the last real row rather than introducing a dummy template;
+    callers discard padding. Never pad beyond the duration group's size.
+    """
+    size = min(maximum, 1 << (int(len(rows)) - 1).bit_length())
+    return numpy.pad(rows, (0, size - len(rows)), mode='edge')

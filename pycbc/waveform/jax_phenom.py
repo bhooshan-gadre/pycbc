@@ -52,6 +52,7 @@ def _f_ref_hz(f_ref, f_lower):
 
 def _ripple_phenomd(length, delta_f, f_lower, f_ref, distance,
                     mass1, mass2, spin1z, spin2z):
+    import jax
     import jax.numpy as jnp
     from pycbc.pnutils import mass1_mass2_to_mchirp_eta
 
@@ -63,16 +64,29 @@ def _ripple_phenomd(length, delta_f, f_lower, f_ref, distance,
         chi1, chi2 = float(spin2z), float(spin1z)
     mc, eta = mass1_mass2_to_mchirp_eta(float(mass1), float(mass2))
     f_ref = _f_ref_hz(f_ref, f_lower)
-    freqs = jnp.arange(int(length), dtype=jnp.float32) * jnp.float32(delta_f)
-    params = jnp.asarray(
-        [mc, eta, chi1, chi2, float(distance), 0.0, 0.0, 0.0],
-        dtype=jnp.float32)
-    hp, _hc = gen(freqs, params, float(f_ref))
-    h = numpy.nan_to_num(numpy.asarray(hp)).astype(numpy.complex64, copy=False)
+    # PhenomD phase coefficients are sensitive to rounded eta/frequency input.
+    # Generate in double precision, then filter/store complex64 as before.
+    # Float32 generation can pass a global overlap check while moving SNR
+    # sidelobes and off-peak veto samples beyond the live parity tolerance.
+    with jax.enable_x64(True):
+        freqs = jnp.arange(int(length), dtype=jnp.float64) * jnp.float64(delta_f)
+        params = jnp.asarray(
+            [mc, eta, chi1, chi2, float(distance), 0.0, 0.0, 0.0],
+            dtype=jnp.float64)
+        hp, _hc = gen(freqs, params, float(f_ref))
+        h = numpy.asarray(hp).astype(numpy.complex64, copy=True)
+    if not numpy.isfinite(h).all():
+        # The unused DC bin can be singular; nonfinite in-band strain is an
+        # actual generation error, not a waveform to silently zero out.
+        kmin = int(float(f_lower) / float(delta_f))
+        if not numpy.isfinite(h[max(1, kmin):-1]).all():
+            raise ValueError('ripplegw IMRPhenomD produced nonfinite in-band strain')
     kmin = int(float(f_lower) / float(delta_f))
     if kmin > 0:
         h[:kmin] = 0
     h[0] = 0
+    # LAL's bank frequency interval excludes its f_final / Nyquist endpoint.
+    h[-1] = 0
     return numpy.asarray(h, dtype=numpy.complex64)
 
 

@@ -1,0 +1,3 @@
+results/*_fixtures/
+validation_results*/
+__pycache__/

@@ -1,0 +1,4166 @@
+{
+  "arguments": {
+    "gpu": "off",
+    "gpu_index": 0,
+    "approximants": [
+      "IMRPhenomD",
+      "TaylorF2"
+    ],
+    "bank_sizes": [
+      10,
+      20
+    ],
+    "repeats": 11,
+    "veto_samples": 65,
+    "seed": 20261116,
+    "sample_rate": 2048,
+    "f_lower": 20,
+    "injection_snr": 20,
+    "no_arrays": false,
+    "output": "/tmp/pycbc-p100-final"
+  },
+  "cases": [
+    {
+      "model": "IMRPhenomD",
+      "templates": 10,
+      "dataset": "noise",
+      "fft_length": 49152,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 4.76837158203125e-07,
+          "max_chisq_error": 2.5544847792602354e-08,
+          "max_sg_chisq_error": 5.7014465593141495e-08,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 1.2093882917341148e-07,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.001709174131974578,
+          "rms_complex_snr_error": 0.00030270201386883855,
+          "max_snr_magnitude_error": 0.0013508796691894531,
+          "max_snr_error": 7.963180541992188e-05,
+          "max_chisq_error": 7.682187216617731e-05,
+          "max_sg_chisq_error": 0.0002260592984796861,
+          "max_peak_phase_error_rad": 0.0002611875534057617,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0001107624598912782,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 5.534600692636005e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.001709174131974578,
+          "rms_complex_snr_error": 0.00030270201386883855,
+          "max_snr_magnitude_error": 0.0013508796691894531,
+          "max_snr_error": 7.963180541992188e-05,
+          "max_chisq_error": 7.682187216617731e-05,
+          "max_sg_chisq_error": 0.0002260592984796861,
+          "max_peak_phase_error_rad": 0.0002611875534057617,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0001107624598912782,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 5.534600692636005e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.012039185967296362,
+          "median_s": 0.006973691983148456,
+          "min_s": 0.0068574349861592054,
+          "p95_s": 0.00796255492605269,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.7852592328489069,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.007750692078843713,
+          "median_s": 0.0054761560168117285,
+          "min_s": 0.005414381856098771,
+          "p95_s": 0.005628077429719269,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.273464810304767,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.273464810304767
+        },
+        "jax_cpu_serial": {
+          "setup_s": 4.1700393229257315,
+          "first_s": 0.5640038358978927,
+          "median_s": 0.023420346900820732,
+          "min_s": 0.011318124830722809,
+          "p95_s": 0.03093122655991465,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.29776211311814826,
+          "speedup_vs_native_batch": 0.23382044851862654,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 1.6897987199481577,
+          "first_s": 0.3731852089986205,
+          "median_s": 0.00821347301825881,
+          "min_s": 0.005237310891970992,
+          "p95_s": 0.011118217138573527,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.8490552008444805,
+          "speedup_vs_native_batch": 0.6667284356615113,
+          "speedup_vs_same_backend_serial": 2.8514547803050623
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959299759,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959299759,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.9999999987975944,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999987975944,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943804176,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943804176,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993400243,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993400243,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850170646,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850170646,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995072221,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995072221,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954791736,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954791736,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886837344,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886837344,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999801046077,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999801046077,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982841375,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982841375,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.1980386034338153e-06,
+            "rms_complex_snr_error": 3.022835528554424e-07,
+            "max_snr_magnitude_error": 1.1920928955078125e-06,
+            "max_snr_error": 1.430511474609375e-06,
+            "max_chisq_error": 6.185259137836407e-05,
+            "max_sg_chisq_error": 0.0002260592984796861,
+            "max_peak_phase_error_rad": 8.940696716308594e-08,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 7.929120744987195e-05,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 5.534600692636005e-06,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            10
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959299759,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959299759,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.9999999987975944,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999987975944,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943804176,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943804176,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993400243,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993400243,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850170646,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850170646,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995072221,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995072221,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954791736,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954791736,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886837344,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886837344,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999801046077,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999801046077,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982841375,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982841375,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.1980386034338153e-06,
+            "rms_complex_snr_error": 3.022835528554424e-07,
+            "max_snr_magnitude_error": 1.1920928955078125e-06,
+            "max_snr_error": 1.430511474609375e-06,
+            "max_chisq_error": 6.185259137836407e-05,
+            "max_sg_chisq_error": 0.0002260592984796861,
+            "max_peak_phase_error_rad": 8.940696716308594e-08,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 7.929120744987195e-05,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 5.534600692636005e-06,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 6,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "IMRPhenomD",
+      "templates": 10,
+      "dataset": "injection",
+      "fft_length": 49152,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 1.3623918793115308e-07,
+          "max_sg_chisq_error": 2.7603360486239126e-08,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 1.0569141082328315e-06,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.001986082410439849,
+          "rms_complex_snr_error": 0.00030588512890972197,
+          "max_snr_magnitude_error": 0.0013102293014526367,
+          "max_snr_error": 0.00023508071899414062,
+          "max_chisq_error": 0.00036907196044921875,
+          "max_sg_chisq_error": 0.00047293085500843546,
+          "max_peak_phase_error_rad": 0.00020706653594970703,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00024632045201045116,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 6.42331635569704e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.001986082410439849,
+          "rms_complex_snr_error": 0.00030588512890972197,
+          "max_snr_magnitude_error": 0.0013102293014526367,
+          "max_snr_error": 0.00023508071899414062,
+          "max_chisq_error": 0.00036907196044921875,
+          "max_sg_chisq_error": 0.00047293085500843546,
+          "max_peak_phase_error_rad": 0.00020706653594970703,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00024632045201045116,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 6.42331635569704e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.007051694905385375,
+          "median_s": 0.005349067971110344,
+          "min_s": 0.005213927011936903,
+          "p95_s": 0.005607035476714373,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.7703472854093955,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.004549586912617087,
+          "median_s": 0.004120639991015196,
+          "min_s": 0.0040820559952408075,
+          "p95_s": 0.004262770991772413,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.2981158224872011,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.2981158224872011
+        },
+        "jax_cpu_serial": {
+          "setup_s": 3.8931497540324926,
+          "first_s": 0.46632694313302636,
+          "median_s": 0.009000154910609126,
+          "min_s": 0.008762588957324624,
+          "p95_s": 0.013722200994379818,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.5943306558873798,
+          "speedup_vs_native_batch": 0.45784100739842853,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 1.8645257188472897,
+          "first_s": 0.3957788101397455,
+          "median_s": 0.0053860938642174006,
+          "min_s": 0.0031222968827933073,
+          "p95_s": 0.009127523051574826,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.993125650231787,
+          "speedup_vs_native_batch": 0.7650516487264978,
+          "speedup_vs_same_backend_serial": 1.6709985264835054
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959299759,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959299759,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.9999999987975944,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999987975944,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943804176,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943804176,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993400243,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993400243,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850170646,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850170646,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995072221,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995072221,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954791736,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954791736,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886837344,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886837344,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999801046077,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999801046077,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982841375,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982841375,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 4.074098342243815e-06,
+            "rms_complex_snr_error": 3.1742905548526323e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 9.5367431640625e-07,
+            "max_chisq_error": 0.00043555668422179394,
+            "max_sg_chisq_error": 0.00047293085500843546,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.0007128034319197063,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 6.42331635569704e-06,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            10
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959299759,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959299759,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.9999999987975944,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999987975944,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943804176,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943804176,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993400243,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993400243,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850170646,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850170646,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995072221,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995072221,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954791736,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954791736,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886837344,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886837344,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999801046077,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999801046077,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982841375,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982841375,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 4.074098342243815e-06,
+            "rms_complex_snr_error": 3.1742905548526323e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 9.5367431640625e-07,
+            "max_chisq_error": 0.00043555668422179394,
+            "max_sg_chisq_error": 0.00047293085500843546,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.0007128034319197063,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 6.42331635569704e-06,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 0,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "IMRPhenomD",
+      "templates": 20,
+      "dataset": "noise",
+      "fft_length": 65536,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 4.76837158203125e-07,
+          "max_chisq_error": 3.405979698278827e-08,
+          "max_sg_chisq_error": 5.0526576700349324e-08,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 1.2857061171267503e-07,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.0016987695125862956,
+          "rms_complex_snr_error": 0.0002630569797474891,
+          "max_snr_magnitude_error": 0.001270592212677002,
+          "max_snr_error": 0.00022459030151367188,
+          "max_chisq_error": 0.0002778768539428711,
+          "max_sg_chisq_error": 4.880086069469769e-06,
+          "max_peak_phase_error_rad": 0.00036966800689697266,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00018467221941276257,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 4.701751135094412e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.0016987695125862956,
+          "rms_complex_snr_error": 0.0002630569797474891,
+          "max_snr_magnitude_error": 0.001270592212677002,
+          "max_snr_error": 0.00022459030151367188,
+          "max_chisq_error": 0.0002778768539428711,
+          "max_sg_chisq_error": 4.880086069469769e-06,
+          "max_peak_phase_error_rad": 0.00036966800689697266,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00018467221941276257,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 4.701751135094412e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.023780340095981956,
+          "median_s": 0.01510716904886067,
+          "min_s": 0.01478488091379404,
+          "p95_s": 0.015278114937245846,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.951615753687262,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.0163827589713037,
+          "median_s": 0.014376220060512424,
+          "min_s": 0.01334378495812416,
+          "p95_s": 0.01589104044251144,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0508443099278901,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.0508443099278901
+        },
+        "jax_cpu_serial": {
+          "setup_s": 5.984508063877001,
+          "first_s": 0.43120302609167993,
+          "median_s": 0.024674943881109357,
+          "min_s": 0.020556194009259343,
+          "p95_s": 0.02882313949521631,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.6122473518744825,
+          "speedup_vs_native_batch": 0.582624225197066,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 4.0029391860589385,
+          "first_s": 0.4313097088597715,
+          "median_s": 0.015746176009997725,
+          "min_s": 0.01415267400443554,
+          "p95_s": 0.017364424071274698,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.9594182764925699,
+          "speedup_vs_native_batch": 0.9129975462858109,
+          "speedup_vs_same_backend_serial": 1.5670435707972834
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959285417,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959285417,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.999999998797225,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.999999998797225,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943784764,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943784764,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993398222,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993398222,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850125852,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850125852,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995070641,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995070641,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954779463,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954779463,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886798423,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886798423,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999800978635,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999800978635,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982836014,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982836014,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 10,
+              "match_template": 0.9999999830104833,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999830104833,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 11,
+              "match_template": 0.9999999984265486,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999984265486,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 12,
+              "match_template": 0.9999999997073018,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999997073018,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 13,
+              "match_template": 0.9999999995532717,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995532717,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 14,
+              "match_template": 0.9999999989593688,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999989593688,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 15,
+              "match_template": 0.9999999961099528,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999961099528,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 16,
+              "match_template": 0.9999999981378422,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999981378422,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 17,
+              "match_template": 0.9999999994369325,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999994369325,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 18,
+              "match_template": 0.9999999968029114,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999968029114,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 19,
+              "match_template": 0.9999999965969015,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999965969015,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.2054293847540976e-06,
+            "rms_complex_snr_error": 2.909310694576561e-07,
+            "max_snr_magnitude_error": 1.430511474609375e-06,
+            "max_snr_error": 4.76837158203125e-07,
+            "max_chisq_error": 0.000274743352617568,
+            "max_sg_chisq_error": 4.880086069469769e-06,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.0001302446637834187,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 4.701751135094412e-06,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            20
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959285417,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959285417,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.999999998797225,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.999999998797225,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943784764,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943784764,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993398222,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993398222,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850125852,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850125852,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995070641,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995070641,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954779463,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954779463,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886798423,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886798423,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999800978635,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999800978635,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982836014,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982836014,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 10,
+              "match_template": 0.9999999830104833,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999830104833,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 11,
+              "match_template": 0.9999999984265486,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999984265486,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 12,
+              "match_template": 0.9999999997073018,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999997073018,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 13,
+              "match_template": 0.9999999995532717,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995532717,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 14,
+              "match_template": 0.9999999989593688,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999989593688,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 15,
+              "match_template": 0.9999999961099528,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999961099528,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 16,
+              "match_template": 0.9999999981378422,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999981378422,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 17,
+              "match_template": 0.9999999994369325,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999994369325,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 18,
+              "match_template": 0.9999999968029114,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999968029114,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 19,
+              "match_template": 0.9999999965969015,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999965969015,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.2054293847540976e-06,
+            "rms_complex_snr_error": 2.909310694576561e-07,
+            "max_snr_magnitude_error": 1.430511474609375e-06,
+            "max_snr_error": 4.76837158203125e-07,
+            "max_chisq_error": 0.000274743352617568,
+            "max_sg_chisq_error": 4.880086069469769e-06,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.0001302446637834187,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 4.701751135094412e-06,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 16,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "IMRPhenomD",
+      "templates": 20,
+      "dataset": "injection",
+      "fft_length": 65536,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 4.0871756468163767e-07,
+          "max_sg_chisq_error": 4.876857317981376e-08,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 6.316969436426234e-07,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.002525745891034603,
+          "rms_complex_snr_error": 0.00026632685330696404,
+          "max_snr_magnitude_error": 0.0015431642532348633,
+          "max_snr_error": 0.000164031982421875,
+          "max_chisq_error": 0.0007155878203255472,
+          "max_sg_chisq_error": 4.387340889033808e-06,
+          "max_peak_phase_error_rad": 0.0003489255905151367,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0008831024169921875,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 5.256057313829388e-07,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.005,
+          "max_complex_snr_error": 0.002525745891034603,
+          "rms_complex_snr_error": 0.00026632685330696404,
+          "max_snr_magnitude_error": 0.0015431642532348633,
+          "max_snr_error": 0.000164031982421875,
+          "max_chisq_error": 0.0007155878203255472,
+          "max_sg_chisq_error": 4.387340889033808e-06,
+          "max_peak_phase_error_rad": 0.0003489255905151367,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0008831024169921875,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 5.256057313829388e-07,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": false
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.014983857050538063,
+          "median_s": 0.011790537973865867,
+          "min_s": 0.010983043815940619,
+          "p95_s": 0.012814488029107451,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.877083470124146,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.018535233102738857,
+          "median_s": 0.010341285960748792,
+          "min_s": 0.00890389597043395,
+          "p95_s": 0.013900324003770947,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.1401423399969628,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.1401423399969628
+        },
+        "jax_cpu_serial": {
+          "setup_s": 6.044199406169355,
+          "first_s": 0.4855804080143571,
+          "median_s": 0.02949020196683705,
+          "min_s": 0.021647035842761397,
+          "p95_s": 0.03663491108454764,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.39981204561178707,
+          "speedup_vs_native_batch": 0.3506685363626195,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 3.9939845099579543,
+          "first_s": 0.40485067712143064,
+          "median_s": 0.015716277062892914,
+          "min_s": 0.013679995900020003,
+          "p95_s": 0.020642856368795037,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.7502118934836065,
+          "speedup_vs_native_batch": 0.6579984508650077,
+          "speedup_vs_same_backend_serial": 1.8764114331163841
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959285417,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959285417,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.999999998797225,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.999999998797225,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943784764,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943784764,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993398222,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993398222,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850125852,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850125852,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995070641,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995070641,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954779463,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954779463,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886798423,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886798423,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999800978635,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999800978635,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982836014,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982836014,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 10,
+              "match_template": 0.9999999830104833,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999830104833,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 11,
+              "match_template": 0.9999999984265486,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999984265486,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 12,
+              "match_template": 0.9999999997073018,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999997073018,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 13,
+              "match_template": 0.9999999995532717,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995532717,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 14,
+              "match_template": 0.9999999989593688,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999989593688,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 15,
+              "match_template": 0.9999999961099528,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999961099528,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 16,
+              "match_template": 0.9999999981378422,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999981378422,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 17,
+              "match_template": 0.9999999994369325,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999994369325,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 18,
+              "match_template": 0.9999999968029114,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999968029114,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 19,
+              "match_template": 0.9999999965969015,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999965969015,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 3.82214057026431e-06,
+            "rms_complex_snr_error": 3.0150613383739255e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 3.814697265625e-06,
+            "max_chisq_error": 0.0006510104451861176,
+            "max_sg_chisq_error": 4.387340889033808e-06,
+            "max_peak_phase_error_rad": 1.1920928955078125e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.0006758144923619813,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 5.256057313829388e-07,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            20
+          ],
+          "waveforms": [
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 0,
+              "match_template": 0.9999999959285417,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999959285417,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 1,
+              "match_template": 0.999999998797225,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.999999998797225,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 2,
+              "match_template": 0.9999999943784764,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999943784764,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 3,
+              "match_template": 0.9999999993398222,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999993398222,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 4,
+              "match_template": 0.9999999850125852,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999850125852,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 5,
+              "match_template": 0.9999999995070641,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995070641,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 6,
+              "match_template": 0.9999999954779463,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999954779463,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 7,
+              "match_template": 0.9999999886798423,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999886798423,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 8,
+              "match_template": 0.9999999800978635,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999800978635,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 9,
+              "match_template": 0.9999999982836014,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999982836014,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 10,
+              "match_template": 0.9999999830104833,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999830104833,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 11,
+              "match_template": 0.9999999984265486,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999984265486,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 12,
+              "match_template": 0.9999999997073018,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999997073018,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 13,
+              "match_template": 0.9999999995532717,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999995532717,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 14,
+              "match_template": 0.9999999989593688,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999989593688,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 15,
+              "match_template": 0.9999999961099528,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999961099528,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 16,
+              "match_template": 0.9999999981378422,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999981378422,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 17,
+              "match_template": 0.9999999994369325,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999994369325,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 18,
+              "match_template": 0.9999999968029114,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999968029114,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            },
+            {
+              "approximant": "IMRPhenomD",
+              "template_id": 19,
+              "match_template": 0.9999999965969015,
+              "match_spa": null,
+              "match_lal_taylorf2": null,
+              "match_lal_phenomd": 0.9999999965969015,
+              "implementation": "ripple",
+              "use_generated": true,
+              "generation_device": "cpu:0"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 3.82214057026431e-06,
+            "rms_complex_snr_error": 3.0150613383739255e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 3.814697265625e-06,
+            "max_chisq_error": 0.0006510104451861176,
+            "max_sg_chisq_error": 4.387340889033808e-06,
+            "max_peak_phase_error_rad": 1.1920928955078125e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.0006758144923619813,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 5.256057313829388e-07,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 0,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "TaylorF2",
+      "templates": 10,
+      "dataset": "noise",
+      "fft_length": 32768,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 2.384185791015625e-07,
+          "max_chisq_error": 5.108969558520471e-08,
+          "max_sg_chisq_error": 9.803603884250833e-08,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 6.59877654740626e-08,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 1.1920928955078125e-06,
+          "rms_complex_snr_error": 2.7181374662177404e-07,
+          "max_snr_magnitude_error": 1.430511474609375e-06,
+          "max_snr_error": 9.5367431640625e-07,
+          "max_chisq_error": 1.4475413731229736e-05,
+          "max_sg_chisq_error": 2.4162426641716195e-06,
+          "max_peak_phase_error_rad": 2.384185791015625e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 7.62939453125e-06,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.5708940148684292e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 1.1920928955078125e-06,
+          "rms_complex_snr_error": 2.7181374662177404e-07,
+          "max_snr_magnitude_error": 1.430511474609375e-06,
+          "max_snr_error": 9.5367431640625e-07,
+          "max_chisq_error": 1.4475413731229736e-05,
+          "max_sg_chisq_error": 2.4162426641716195e-06,
+          "max_peak_phase_error_rad": 2.384185791015625e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 7.62939453125e-06,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.5708940148684292e-06,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.007896516006439924,
+          "median_s": 0.005078847054392099,
+          "min_s": 0.004882076987996697,
+          "p95_s": 0.00531335303094238,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.7174341079521371,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.004039048915728927,
+          "median_s": 0.003643738105893135,
+          "min_s": 0.0035254941321909428,
+          "p95_s": 0.0038539295783266425,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.3938562286290324,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.3938562286290324
+        },
+        "jax_cpu_serial": {
+          "setup_s": 0.04822529689408839,
+          "first_s": 0.39088387903757393,
+          "median_s": 0.010104479966685176,
+          "min_s": 0.008346818154677749,
+          "p95_s": 0.012116782017983496,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.5026331954872726,
+          "speedup_vs_native_batch": 0.36060619823154355,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 0.036791072925552726,
+          "first_s": 0.4127917338628322,
+          "median_s": 0.00345036294311285,
+          "min_s": 0.002563545946031809,
+          "p95_s": 0.004547261516563594,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.471974727913714,
+          "speedup_vs_native_batch": 1.0560448758488652,
+          "speedup_vs_same_backend_serial": 2.928526689302173
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.1920928955078125e-06,
+            "rms_complex_snr_error": 2.7181374662177404e-07,
+            "max_snr_magnitude_error": 1.430511474609375e-06,
+            "max_snr_error": 9.5367431640625e-07,
+            "max_chisq_error": 1.4475413731229736e-05,
+            "max_sg_chisq_error": 2.4162426641716195e-06,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 7.62939453125e-06,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 1.5708940148684292e-06,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            10
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.1920928955078125e-06,
+            "rms_complex_snr_error": 2.7181374662177404e-07,
+            "max_snr_magnitude_error": 1.430511474609375e-06,
+            "max_snr_error": 9.5367431640625e-07,
+            "max_chisq_error": 1.4475413731229736e-05,
+            "max_sg_chisq_error": 2.4162426641716195e-06,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 7.62939453125e-06,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 1.5708940148684292e-06,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 6,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "TaylorF2",
+      "templates": 10,
+      "dataset": "injection",
+      "fft_length": 32768,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 4.0871756468163767e-07,
+          "max_sg_chisq_error": 3.827731340777518e-07,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 7.009422091641682e-07,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 2.1324806311895372e-06,
+          "rms_complex_snr_error": 2.93054085886979e-07,
+          "max_snr_magnitude_error": 3.814697265625e-06,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 0.00018487657819399317,
+          "max_sg_chisq_error": 1.3364474504840018e-06,
+          "max_peak_phase_error_rad": 2.384185791015625e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00022854123796733905,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.4705591537378382e-05,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 2.1324806311895372e-06,
+          "rms_complex_snr_error": 2.93054085886979e-07,
+          "max_snr_magnitude_error": 3.814697265625e-06,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 0.00018487657819399317,
+          "max_sg_chisq_error": 1.3364474504840018e-06,
+          "max_peak_phase_error_rad": 2.384185791015625e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00022854123796733905,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.4705591537378382e-05,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.005356882931664586,
+          "median_s": 0.0034975989256054163,
+          "min_s": 0.003434073878452182,
+          "p95_s": 0.0039457009406760335,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.7210220586732603,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.003513628151267767,
+          "median_s": 0.002521845977753401,
+          "min_s": 0.002269148826599121,
+          "p95_s": 0.002624851535074413,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.3869201198089305,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.3869201198089305
+        },
+        "jax_cpu_serial": {
+          "setup_s": 0.04499889095313847,
+          "first_s": 0.3885148561093956,
+          "median_s": 0.008199833100661635,
+          "min_s": 0.007685925113037229,
+          "p95_s": 0.013267780421301723,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.42654513606175704,
+          "speedup_vs_native_batch": 0.307548452120314,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 0.037546660052612424,
+          "first_s": 0.367485866881907,
+          "median_s": 0.003492570947855711,
+          "min_s": 0.0024654539301991463,
+          "p95_s": 0.004959127050824463,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0014396207907508,
+          "speedup_vs_native_batch": 0.7220600570195164,
+          "speedup_vs_same_backend_serial": 2.3477928503345025
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 2.1324806311895372e-06,
+            "rms_complex_snr_error": 2.93054085886979e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 1.9073486328125e-06,
+            "max_chisq_error": 0.00018487657819399317,
+            "max_sg_chisq_error": 1.3364474504840018e-06,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.00022854123796733905,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 1.4705591537378382e-05,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            10
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 2.1324806311895372e-06,
+            "rms_complex_snr_error": 2.93054085886979e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 1.9073486328125e-06,
+            "max_chisq_error": 0.00018487657819399317,
+            "max_sg_chisq_error": 1.3364474504840018e-06,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.00022854123796733905,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 1.4705591537378382e-05,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 0,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "TaylorF2",
+      "templates": 20,
+      "dataset": "noise",
+      "fft_length": 49152,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 4.76837158203125e-07,
+          "max_chisq_error": 3.405979698278827e-08,
+          "max_sg_chisq_error": 4.8657183171485485e-08,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 8.37364784178618e-08,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 1.2839233249906101e-06,
+          "rms_complex_snr_error": 2.878610700918216e-07,
+          "max_snr_magnitude_error": 1.430511474609375e-06,
+          "max_snr_error": 9.5367431640625e-07,
+          "max_chisq_error": 5.270753588004773e-05,
+          "max_sg_chisq_error": 0.00012655945961700943,
+          "max_peak_phase_error_rad": 1.1920928955078125e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 4.032679966514685e-05,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 9.937130543424821e-08,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 1.2839233249906101e-06,
+          "rms_complex_snr_error": 2.878610700918216e-07,
+          "max_snr_magnitude_error": 1.430511474609375e-06,
+          "max_snr_error": 9.5367431640625e-07,
+          "max_chisq_error": 5.270753588004773e-05,
+          "max_sg_chisq_error": 0.00012655945961700943,
+          "max_peak_phase_error_rad": 1.1920928955078125e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 4.032679966514685e-05,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 2.9308640095426775e-07,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.018240446923300624,
+          "median_s": 0.012220365926623344,
+          "min_s": 0.012078233994543552,
+          "p95_s": 0.012520911055617034,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.8354947956478816,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.01157648116350174,
+          "median_s": 0.010210052132606506,
+          "min_s": 0.009838653029873967,
+          "p95_s": 0.011551017523743212,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.1968955464582558,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.1968955464582558
+        },
+        "jax_cpu_serial": {
+          "setup_s": 0.046735489973798394,
+          "first_s": 0.611407978925854,
+          "median_s": 0.01925771706737578,
+          "min_s": 0.017654627095907927,
+          "p95_s": 0.023448860505595803,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.6345698134347237,
+          "speedup_vs_native_batch": 0.5301797765999589,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 0.037766160909086466,
+          "first_s": 0.3971779500134289,
+          "median_s": 0.012674942845478654,
+          "min_s": 0.010181128978729248,
+          "p95_s": 0.016456259530968964,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.9641357815654795,
+          "speedup_vs_native_batch": 0.8055304277958609,
+          "speedup_vs_same_backend_serial": 1.519353365308886
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 10,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 11,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 12,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 13,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 14,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 15,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 16,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 17,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 18,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 19,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.2839233249906101e-06,
+            "rms_complex_snr_error": 2.878610700918216e-07,
+            "max_snr_magnitude_error": 1.430511474609375e-06,
+            "max_snr_error": 9.5367431640625e-07,
+            "max_chisq_error": 5.270753588004773e-05,
+            "max_sg_chisq_error": 0.00012655945961700943,
+            "max_peak_phase_error_rad": 1.1920928955078125e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 4.032679966514685e-05,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 9.937130543424821e-08,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            20
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 10,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 11,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 12,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 13,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 14,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 15,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 16,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 17,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 18,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 19,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 1.2839233249906101e-06,
+            "rms_complex_snr_error": 2.878610700918216e-07,
+            "max_snr_magnitude_error": 1.430511474609375e-06,
+            "max_snr_error": 9.5367431640625e-07,
+            "max_chisq_error": 5.270753588004773e-05,
+            "max_sg_chisq_error": 0.00012655945961700943,
+            "max_peak_phase_error_rad": 1.1920928955078125e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 4.032679966514685e-05,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 2.9308640095426775e-07,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 2.384185791015625e-07,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.9371509552001953e-07,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 2,
+      "failures": [],
+      "passed": true
+    },
+    {
+      "model": "TaylorF2",
+      "templates": 20,
+      "dataset": "injection",
+      "fft_length": 49152,
+      "valid_length": 16384,
+      "waveform_sources": {
+        "TaylorF2": "regular LAL TaylorF2, copied to the selected filter device",
+        "IMRPhenomD": "ripplegw generated under the selected JAX device context"
+      },
+      "metrics": {
+        "native_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "native_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 4.0871756468163767e-07,
+          "max_sg_chisq_error": 4.3180295961064985e-07,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 8.593899352149492e-07,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 3.84438408218557e-06,
+          "rms_complex_snr_error": 3.0126020078569127e-07,
+          "max_snr_magnitude_error": 3.814697265625e-06,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 0.00041920798165406836,
+          "max_sg_chisq_error": 1.807693833044688e-05,
+          "max_peak_phase_error_rad": 2.384185791015625e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00040967123849044995,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.4082366023515647e-05,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 3.84438408218557e-06,
+          "rms_complex_snr_error": 3.0126020078569127e-07,
+          "max_snr_magnitude_error": 3.814697265625e-06,
+          "max_snr_error": 1.9073486328125e-06,
+          "max_chisq_error": 0.00041920798165406836,
+          "max_sg_chisq_error": 1.807693833044688e-05,
+          "max_peak_phase_error_rad": 2.384185791015625e-07,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.00040967123849044995,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 1.1221343074296897e-05,
+          "sg_curve_passed": true,
+          "cross_model_veto_curves_gated": true
+        }
+      },
+      "timings": {
+        "native_serial": {
+          "setup_s": 0,
+          "first_s": 0.012171722948551178,
+          "median_s": 0.009534886805340648,
+          "min_s": 0.009442989015951753,
+          "p95_s": 0.009881975478492677,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.0,
+          "speedup_vs_native_batch": 0.7509073970868402,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "native_batch": {
+          "setup_s": 0,
+          "first_s": 0.011802601860836148,
+          "median_s": 0.007159817032516003,
+          "min_s": 0.0070809959433972836,
+          "p95_s": 0.007344754063524306,
+          "repeats": 11,
+          "speedup_vs_native_serial": 1.3317221322889072,
+          "speedup_vs_native_batch": 1.0,
+          "speedup_vs_same_backend_serial": 1.3317221322889072
+        },
+        "jax_cpu_serial": {
+          "setup_s": 0.04756561201065779,
+          "first_s": 0.5787503779865801,
+          "median_s": 0.019655109848827124,
+          "min_s": 0.016613183077424765,
+          "p95_s": 0.02518895349930972,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.4851098202287392,
+          "speedup_vs_native_batch": 0.3642725524092275,
+          "speedup_vs_same_backend_serial": 1.0
+        },
+        "jax_cpu_batch": {
+          "setup_s": 0.03731369483284652,
+          "first_s": 0.3896842021495104,
+          "median_s": 0.012178003089502454,
+          "min_s": 0.008595321793109179,
+          "p95_s": 0.01351502991747111,
+          "repeats": 11,
+          "speedup_vs_native_serial": 0.7829597952360354,
+          "speedup_vs_native_batch": 0.5879303018643367,
+          "speedup_vs_same_backend_serial": 1.6139846331431795
+        }
+      },
+      "implementations": {
+        "jax_cpu_serial": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 10,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 11,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 12,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 13,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 14,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 15,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 16,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 17,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 18,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 19,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 3.84438408218557e-06,
+            "rms_complex_snr_error": 3.0126020078569127e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 1.9073486328125e-06,
+            "max_chisq_error": 0.00041920798165406836,
+            "max_sg_chisq_error": 1.807693833044688e-05,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.00040967123849044995,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 1.4082366023515647e-05,
+            "sg_curve_passed": true
+          }
+        },
+        "jax_cpu_batch": {
+          "device": "cpu:0",
+          "device_kind": "cpu",
+          "chunks": [
+            20
+          ],
+          "waveforms": [
+            {
+              "template_id": 0,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 1,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 2,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 3,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 4,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 5,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 6,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 7,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 8,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 9,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 10,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 11,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 12,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 13,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 14,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 15,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 16,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 17,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 18,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            },
+            {
+              "template_id": 19,
+              "approximant": "TaylorF2",
+              "implementation": "lal-taylorf2",
+              "use_generated": false,
+              "match_template": 1.0,
+              "waveform_source": "native LAL TaylorF2"
+            }
+          ],
+          "filter_only": {
+            "complex_snr_absolute_tolerance": 0.001,
+            "max_complex_snr_error": 3.84438408218557e-06,
+            "rms_complex_snr_error": 3.0126020078569127e-07,
+            "max_snr_magnitude_error": 3.814697265625e-06,
+            "max_snr_error": 1.9073486328125e-06,
+            "max_chisq_error": 0.00041920798165406836,
+            "max_sg_chisq_error": 1.807693833044688e-05,
+            "max_peak_phase_error_rad": 2.384185791015625e-07,
+            "max_peak_time_error_samples": 0.0,
+            "passed": true,
+            "max_power_curve_error": 0.00040967123849044995,
+            "power_curve_passed": true,
+            "max_sg_curve_error": 1.1221343074296897e-05,
+            "sg_curve_passed": true
+          }
+        }
+      },
+      "jax_cpu_serial_consistency": {
+        "jax_cpu_serial": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 0.0,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 0.0,
+          "sg_curve_passed": true
+        },
+        "jax_cpu_batch": {
+          "complex_snr_absolute_tolerance": 0.001,
+          "max_complex_snr_error": 0.0,
+          "rms_complex_snr_error": 0.0,
+          "max_snr_magnitude_error": 0.0,
+          "max_snr_error": 0.0,
+          "max_chisq_error": 0.0,
+          "max_sg_chisq_error": 9.5367431640625e-07,
+          "max_peak_phase_error_rad": 0.0,
+          "max_peak_time_error_samples": 0.0,
+          "passed": true,
+          "max_power_curve_error": 0.0,
+          "power_curve_passed": true,
+          "max_sg_curve_error": 2.86102294921875e-06,
+          "sg_curve_passed": true
+        }
+      },
+      "representative_template_id": 0,
+      "failures": [],
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "gpu_tested": false,
+  "status": "PASS_CPU_ONLY_GPU_NOT_TESTED",
+  "python": "3.12.13",
+  "hardware": "[Errno 2] No such file or directory: 'nvidia-smi'",
+  "git_commit": "f99256002668e105a0eb209d8b752cf21022f638",
+  "versions": {
+    "pycbc": "0.0a9271",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "jax-cuda12-plugin": null,
+    "jax-cuda13-plugin": null,
+    "ripplegw": "0.5.1",
+    "numpy": "2.3.5",
+    "scipy": "1.16.3"
+  },
+  "devices": {
+    "cpu": {
+      "name": "cpu:0",
+      "kind": "cpu"
+    }
+  }
+}

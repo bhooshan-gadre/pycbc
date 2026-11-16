@@ -1,0 +1,277 @@
+live 10 templates noise
+         17581 function calls (17561 primitive calls) in 0.158 seconds
+
+   Ordered by: cumulative time
+   List reduced from 201 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    0.158    0.008 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:266(<lambda>)
+       20    0.000    0.000    0.158    0.008 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.158    0.008 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.002    0.000    0.109    0.003 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      180    0.001    0.000    0.100    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.099    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.097    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.097    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.097    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.096    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.096    0.002    0.096    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+       20    0.001    0.000    0.048    0.002 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:687(_process_vetoes)
+      520    0.033    0.000    0.034    0.000 {built-in method numpy.asarray}
+       60    0.001    0.000    0.009    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+       40    0.000    0.000    0.007    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+       40    0.000    0.000    0.007    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.001    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:145(power_chisq_selected)
+       60    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:740(_sg_for_group)
+       20    0.001    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:325(sg_chisq_selected)
+       20    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+       60    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+       20    0.001    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
+       60    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       40    0.000    0.000    0.002    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:755(_bucket_rows)
+
+
+
+offline 10 templates noise
+         31261 function calls (31021 primitive calls) in 0.182 seconds
+
+   Ordered by: cumulative time
+   List reduced from 190 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.004    0.000    0.182    0.009 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:101(run)
+       20    0.000    0.000    0.121    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.121    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.002    0.000    0.120    0.003 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      240    0.001    0.000    0.114    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.111    0.006 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.109    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.109    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.109    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.108    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.108    0.002    0.108    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+      560    0.027    0.000    0.028    0.000 {built-in method numpy.asarray}
+      120    0.002    0.000    0.015    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+      100    0.000    0.000    0.015    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+      100    0.000    0.000    0.013    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.001    0.000    0.011    0.001 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:173(power_chisq_candidate_points)
+      120    0.001    0.000    0.009    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.001    0.000    0.007    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:347(sg_chisq_candidate_points)
+      120    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+      120    0.001    0.000    0.004    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       20    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+     1240    0.004    0.000    0.004    0.000 {built-in method numpy.array}
+      200    0.003    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/threshold_cpu.py:81(threshold_and_cluster)
+       20    0.001    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
+      200    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/eventmgr.py:93(__new__)
+
+
+
+live 10 templates injection
+         19961 function calls (19941 primitive calls) in 0.215 seconds
+
+   Ordered by: cumulative time
+   List reduced from 201 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    0.215    0.011 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:266(<lambda>)
+       20    0.000    0.000    0.215    0.011 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.215    0.011 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.002    0.000    0.122    0.003 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      180    0.001    0.000    0.111    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.109    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.107    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.107    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.107    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.106    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.105    0.002    0.106    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+       20    0.002    0.000    0.092    0.005 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:687(_process_vetoes)
+      520    0.075    0.000    0.076    0.000 {built-in method numpy.asarray}
+       60    0.001    0.000    0.010    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+       40    0.000    0.000    0.008    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+       40    0.000    0.000    0.008    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.000    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:740(_sg_for_group)
+       20    0.002    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:325(sg_chisq_selected)
+       60    0.000    0.000    0.006    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.001    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:145(power_chisq_selected)
+       20    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+       20    0.002    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
+       60    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+       60    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       40    0.000    0.000    0.002    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:755(_bucket_rows)
+
+
+
+offline 10 templates injection
+         32181 function calls (31941 primitive calls) in 0.246 seconds
+
+   Ordered by: cumulative time
+   List reduced from 190 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.005    0.000    0.246    0.012 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:101(run)
+       20    0.000    0.000    0.120    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.119    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.002    0.000    0.119    0.003 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      240    0.001    0.000    0.111    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.108    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.106    0.005 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.106    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.105    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.105    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.104    0.002    0.105    0.002 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+      560    0.090    0.000    0.091    0.000 {built-in method numpy.asarray}
+      100    0.000    0.000    0.016    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+      120    0.002    0.000    0.016    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+      100    0.000    0.000    0.014    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.001    0.000    0.011    0.001 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:173(power_chisq_candidate_points)
+      120    0.001    0.000    0.009    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.002    0.000    0.008    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:347(sg_chisq_candidate_points)
+      120    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+      120    0.001    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       20    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+      960    0.004    0.000    0.004    0.000 {built-in method numpy.array}
+       20    0.002    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
+      200    0.003    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/threshold_cpu.py:81(threshold_and_cluster)
+      120    0.003    0.000    0.003    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:221(batched_device_put)
+
+
+
+live 20 templates noise
+         18661 function calls (18641 primitive calls) in 0.328 seconds
+
+   Ordered by: cumulative time
+   List reduced from 201 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    0.329    0.016 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:266(<lambda>)
+       20    0.000    0.000    0.329    0.016 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.328    0.016 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.003    0.000    0.239    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      180    0.001    0.000    0.227    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.225    0.011 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.223    0.011 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.223    0.003 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.223    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.222    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.221    0.004    0.222    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+       20    0.002    0.000    0.089    0.004 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:687(_process_vetoes)
+      520    0.070    0.000    0.071    0.000 {built-in method numpy.asarray}
+       60    0.001    0.000    0.011    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+       40    0.000    0.000    0.010    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+       40    0.000    0.000    0.009    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.002    0.000    0.007    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:145(power_chisq_selected)
+       60    0.000    0.000    0.006    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.000    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:740(_sg_for_group)
+       20    0.001    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:325(sg_chisq_selected)
+       20    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+       60    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+       20    0.002    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
+       60    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       40    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:755(_bucket_rows)
+
+
+
+offline 20 templates noise
+         38421 function calls (37981 primitive calls) in 0.338 seconds
+
+   Ordered by: cumulative time
+   List reduced from 190 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.005    0.000    0.338    0.017 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:101(run)
+       20    0.000    0.000    0.251    0.013 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.251    0.013 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.002    0.000    0.250    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      240    0.001    0.000    0.241    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.237    0.012 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.235    0.012 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.235    0.003 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.234    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.234    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.233    0.004    0.233    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+      560    0.039    0.000    0.040    0.000 {built-in method numpy.asarray}
+      120    0.002    0.000    0.017    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+      100    0.000    0.000    0.017    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+      100    0.000    0.000    0.015    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.002    0.000    0.012    0.001 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:173(power_chisq_candidate_points)
+      120    0.001    0.000    0.010    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.002    0.000    0.008    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:347(sg_chisq_candidate_points)
+     2160    0.008    0.000    0.008    0.000 {built-in method numpy.array}
+      400    0.006    0.000    0.006    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/threshold_cpu.py:81(threshold_and_cluster)
+      120    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+      400    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/eventmgr.py:93(__new__)
+      120    0.001    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       20    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+      400    0.001    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/threshold_cpu.py:73(__init__)
+
+
+
+live 20 templates injection
+         23081 function calls (23061 primitive calls) in 0.364 seconds
+
+   Ordered by: cumulative time
+   List reduced from 201 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    0.364    0.018 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:266(<lambda>)
+       20    0.000    0.000    0.364    0.018 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.364    0.018 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.004    0.000    0.235    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      180    0.001    0.000    0.221    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.219    0.011 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.217    0.011 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.216    0.003 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.216    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.215    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.214    0.004    0.215    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+       20    0.002    0.000    0.128    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:687(_process_vetoes)
+      520    0.108    0.000    0.109    0.000 {built-in method numpy.asarray}
+       60    0.001    0.000    0.012    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+       40    0.000    0.000    0.010    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+       40    0.000    0.000    0.009    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.000    0.000    0.007    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:740(_sg_for_group)
+       20    0.002    0.000    0.007    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:325(sg_chisq_selected)
+       20    0.002    0.000    0.007    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:145(power_chisq_selected)
+       60    0.000    0.000    0.007    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+       60    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+       20    0.002    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
+       60    0.000    0.000    0.004    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       40    0.000    0.000    0.003    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:755(_bucket_rows)
+
+
+
+offline 20 templates injection
+         40061 function calls (39621 primitive calls) in 0.415 seconds
+
+   Ordered by: cumulative time
+   List reduced from 190 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.007    0.000    0.415    0.021 /home/bug/work/pycbc_live/pycbc/examples/search/jax/compare_searches.py:101(run)
+       20    0.000    0.000    0.228    0.011 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:568(process_data)
+       20    0.000    0.000    0.228    0.011 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:572(process_all)
+       40    0.002    0.000    0.227    0.006 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:615(_process_batch)
+      240    0.001    0.000    0.218    0.001 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/profiler.py:417(wrapper)
+       20    0.000    0.000    0.214    0.011 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2277(device_get)
+       20    0.000    0.000    0.212    0.011 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:387(tree_map)
+       80    0.000    0.000    0.212    0.003 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/tree_util.py:399(<genexpr>)
+       60    0.000    0.000    0.211    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2260(_device_get)
+       60    0.000    0.000    0.211    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:409(__array__)
+       60    0.210    0.003    0.210    0.004 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/array.py:615(_value)
+      560    0.134    0.000    0.136    0.000 {built-in method numpy.asarray}
+      120    0.002    0.000    0.018    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/api.py:2035(device_put)
+      100    0.000    0.000    0.018    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:374(asarray)
+      100    0.001    0.000    0.016    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/numpy/array_constructors.py:107(array)
+       20    0.002    0.000    0.012    0.001 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:173(power_chisq_candidate_points)
+      120    0.001    0.000    0.010    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/dispatch.py:598(_batched_device_put_impl)
+       20    0.002    0.000    0.010    0.001 /home/bug/work/pycbc_live/pycbc/pycbc/vetoes/jax_chisq.py:347(sg_chisq_candidate_points)
+     1640    0.008    0.000    0.008    0.000 {built-in method numpy.array}
+      120    0.000    0.000    0.006    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:86(shard_args)
+      400    0.005    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/threshold_cpu.py:81(threshold_and_cluster)
+      120    0.001    0.000    0.005    0.000 /home/bug/work/pycbc_live/.venv/lib/python3.12/site-packages/jax/_src/interpreters/pxla.py:177(_shard_np_array)
+       20    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:354(set_strain)
+      400    0.000    0.000    0.005    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/events/eventmgr.py:93(__new__)
+       20    0.002    0.000    0.004    0.000 /home/bug/work/pycbc_live/pycbc/pycbc/filter/jax_matchedfilter.py:592(_evaluate_surface)
