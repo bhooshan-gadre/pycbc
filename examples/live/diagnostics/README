@@ -1,0 +1,7 @@
+Regenerate the figures from the repository root with:
+
+    /home/bug/work/pycbc_live/.venv/bin/python examples/live/plot_jax_diagnostics.py
+
+JAX is pinned to the CPU platform. Each PNG is one 8 s valid matched-filter block (the filter buffer is 16 s; the first 7.75 s and the last 0.25 s are padding and are not plotted). SNR uses norm = 4*df/sqrt(sigmasq) times the unnormalized IFFT*N. Power and sine-Gaussian chi-squared are the live vetoes; the live path stores them only at the peak, so the curves evaluate that same code every 64 samples, and every 4 samples within 0.1 s of the peak.
+
+Datasets: aLIGOZeroDetHighPower Gaussian noise; the same noise plus an IMRPhenomD injection; GWOSC H1 around GW150914. The real strain is H-H1_GWOSC_4KHZ_R1-1126259447-32.hdf5 from https://gwosc.org/eventapi/json/GWTC-1-confident/GW150914/v3/ , cached under cache/ and resampled from 4096 Hz to 2048 Hz. The plotted block is GPS 1126259456 to 1126259464.

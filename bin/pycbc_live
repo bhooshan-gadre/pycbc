@@ -954,6 +954,18 @@ parser.add_argument('--output-background-n-loudest', type=int, default=10000,
 
 parser.add_argument('--newsnr-threshold', type=float, default=0)
 parser.add_argument('--max-batch-size', type=int, default=2**27)
+parser.add_argument('--filter-backend', choices=['cpu', 'jax'], default='cpu',
+                    help='Matched filter used on ranks > 0. '
+                         'cpu is LiveBatchMatchedFilter. jax is '
+                         'JaxLiveBatchMatchedFilter. Rank 0 is unchanged.')
+parser.add_argument('--jax-platform', choices=['cpu', 'gpu'], default='cpu',
+                    help='JAX platform for ranks whose filter backend is jax. '
+                         'gpu uses --processing-device-id as the CUDA device.')
+parser.add_argument('--rank-backend', default=None, metavar='LIST',
+                    help='Comma-separated backends cycled across filtering '
+                         'ranks (rank 0 is never a filter). '
+                         'Example: cpu,jax,jax. Overrides --filter-backend '
+                         'on those ranks.')
 parser.add_argument('--store-loudest-index', type=int, default=0)
 parser.add_argument('--max-psd-abort-distance', type=float, default=numpy.inf,
                     help="Safety BNS horizon distance (in Mpc) above which a "
@@ -1068,6 +1080,21 @@ if not args.enable_gracedb_upload and args.enable_single_detector_upload:
     parser.error('You are not allowed to enable single ifo upload without the '
                  '--enable-gracedb-upload option!')
 
+def filter_backend_for_rank(args, rank):
+    """Backend name for this MPI rank. Rank 0 never filters."""
+    if rank <= 0:
+        return 'cpu'
+    if args.rank_backend:
+        parts = [p.strip() for p in args.rank_backend.split(',') if p.strip()]
+        if not parts:
+            parser.error('--rank-backend is empty')
+        bad = [p for p in parts if p not in ('cpu', 'jax')]
+        if bad:
+            parser.error('--rank-backend entries must be cpu or jax, got %s'
+                         % ','.join(bad))
+        return parts[(rank - 1) % len(parts)]
+    return args.filter_backend
+
 # Configure the log messages so that they are prefixed by the timestamp, the
 # hostname of the originating node and the MPI rank of the originating process
 pycbc.init_logging(
@@ -1079,6 +1106,13 @@ pycbc.init_logging(
 
 ctx = scheme.from_cli(args)
 fft.from_cli(args)
+_this_filter_backend = filter_backend_for_rank(args, mpi.COMM_WORLD.Get_rank())
+# JAX ranks keep StrainBuffer on the CPU scheme. The scheme object is a
+# process singleton, so a CUDA context cannot be replaced after from_cli.
+if _this_filter_backend == 'jax' and not isinstance(ctx, scheme.CPUScheme):
+    parser.error('--filter-backend jax uses the CPU processing scheme for '
+                 'strain and data conditioning. Pass --processing-scheme cpu '
+                 'on JAX ranks.')
 
 # Approximant guess of the total padding
 valid_pad = args.analysis_chunk
@@ -1122,38 +1156,59 @@ if evnt.rank == 0 and args.enable_gracedb_upload:
 
 # I'm not the root, so do some actual filtering.
 with ctx:
-    try:
-        # Import system wisdom.
-        if args.fftw_import_system_wisdom:
-            fft.fftw.import_sys_wisdom()
+    filter_backend = filter_backend_for_rank(args, evnt.rank)
+    # FFTW plans are used by the CPU filter and by rank 0. JAX ranks keep
+    # the strain path on the CPU scheme and do not need a plan.
+    if filter_backend != 'jax':
+        try:
+            # Import system wisdom.
+            if args.fftw_import_system_wisdom:
+                fft.fftw.import_sys_wisdom()
 
-        # Read specified user-provided wisdom files
-        if args.fftw_input_float_wisdom_file is not None:
-            fft.fftw.import_single_wisdom_from_filename(args.fftw_input_float_wisdom_file)
+            # Read specified user-provided wisdom files
+            if args.fftw_input_float_wisdom_file is not None:
+                fft.fftw.import_single_wisdom_from_filename(args.fftw_input_float_wisdom_file)
 
-        if args.fftw_input_double_wisdom_file is not None:
-            fft.fftw.import_double_wisdom_from_filename(args.fftw_input_double_wisdom_file)
+            if args.fftw_input_double_wisdom_file is not None:
+                fft.fftw.import_double_wisdom_from_filename(args.fftw_input_double_wisdom_file)
 
-        if args.fftw_planning_limit:
-            fft.fftw.set_planning_limit(args.fftw_planning_limit)
-    except (ValueError, RuntimeError) as e:
-        print(e)
-        exit()
+            if args.fftw_planning_limit:
+                fft.fftw.set_planning_limit(args.fftw_planning_limit)
+        except (ValueError, RuntimeError) as e:
+            print(e)
+            exit()
 
     if evnt.rank > 0:
         bank.table.sort(order='mchirp')
         waveforms = list(bank[evnt.rank-1::evnt.size-1])
         check_max_length(args, waveforms)
-        mf = LiveBatchMatchedFilter(
-            waveforms,
-            args.snr_threshold,
-            args.chisq_bins,
-            sg_chisq,
-            snr_abort_threshold=args.snr_abort_threshold,
-            newsnr_threshold=args.newsnr_threshold,
-            max_triggers_in_batch=args.max_triggers_in_batch,
-            maxelements=args.max_batch_size
-        )
+        if filter_backend == 'jax':
+            from pycbc.filter.jax_matchedfilter import JaxLiveBatchMatchedFilter
+            logging.info('Filtering rank %s using JAX on %s',
+                         evnt.rank, args.jax_platform)
+            mf = JaxLiveBatchMatchedFilter(
+                waveforms,
+                args.snr_threshold,
+                args.chisq_bins,
+                sg_chisq,
+                snr_abort_threshold=args.snr_abort_threshold,
+                newsnr_threshold=args.newsnr_threshold,
+                max_triggers_in_batch=args.max_triggers_in_batch,
+                maxelements=args.max_batch_size,
+                jax_platform=args.jax_platform,
+                device_id=args.processing_device_id,
+            )
+        else:
+            mf = LiveBatchMatchedFilter(
+                waveforms,
+                args.snr_threshold,
+                args.chisq_bins,
+                sg_chisq,
+                snr_abort_threshold=args.snr_abort_threshold,
+                newsnr_threshold=args.newsnr_threshold,
+                max_triggers_in_batch=args.max_triggers_in_batch,
+                maxelements=args.max_batch_size
+            )
 
     # Synchronize start time if not provided on the command line
     if not args.start_time:

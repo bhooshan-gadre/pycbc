@@ -204,17 +204,20 @@ parser.add_argument('--f-min', type=float, required=True)
 parser.add_argument('--bank', type=str, required=True)
 parser.add_argument('--injections', type=str, required=True)
 parser.add_argument('--detectors', type=str, required=True, nargs='+')
-args = parser.parse_args()
 
-pycbc.init_logging(args.verbose, default_level=1)
 
-single_fail = check_single_results(args)
-found_fail = check_found_events(args)
-fail = single_fail or found_fail
+def main(argv=None):
+    args = parser.parse_args(argv)
+    pycbc.init_logging(args.verbose, default_level=1)
+    single_fail = check_single_results(args)
+    found_fail = check_found_events(args)
+    fail = single_fail or found_fail
+    if fail:
+        log.error('Test Failed')
+    else:
+        log.info('Test Passed')
+    return 1 if fail else 0
 
-if fail:
-    log.error('Test Failed')
-else:
-    log.info('Test Passed')
 
-sys.exit(1 if fail else 0)
+if __name__ == '__main__':
+    sys.exit(main())

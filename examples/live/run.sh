@@ -1,6 +1,12 @@
 #!/bin/bash
 
 # example/test of running PyCBC Live on simulated data
+#
+# Optional JAX filter (does not replace this SEOBNRv4 path). Install with
+#   pip install 'jax' 'ripplegw'
+# and see run_jax_parity.sh. Extra flags: --filter-backend {cpu,jax},
+# --jax-platform {cpu,gpu}, --rank-backend cpu,jax,jax
+# Rank 0 stays on CPU. --processing-device-id selects the JAX GPU.
 
 set -e
 

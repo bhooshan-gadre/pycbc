@@ -180,6 +180,11 @@ extras_require = {
     'igwn': [
         'ciecplib>=0.7.0',
     ],
+    # Batched live matched filtering. CPU installs of PyCBC do not need these.
+    'jax': [
+        'jax>=0.4',
+        'ripplegw>=0.5',
+    ],
 }
 
 def get_reqs_from_file(filename):

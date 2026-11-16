@@ -4,3 +4,4 @@ injections.hdf
 stat*.hdf
 output/
 *.fits
+jax_parity/
