@@ -95,4 +95,19 @@ class IFFT(_BaseIFFT):
         self.prec, self.itype, self.otype = _check_fft_args(invec, outvec)
 
     def execute(self):
-        ifft(self.invec, self.outvec, self.prec, self.itype, self.otype)
+        if self.nbatch == 1:
+            ifft(self.invec, self.outvec, self.prec, self.itype, self.otype)
+            return
+        if self.inplace:
+            raise NotImplementedError("numpy backend of pycbc.fft does not "
+                                      "support in-place transforms")
+        # A live-filter workspace concatenates independent template spectra.
+        # Transform each row, rather than interpreting the buffer as one FFT.
+        data = self.invec.data.reshape(self.nbatch, self.idist)
+        if self.itype == 'complex' and self.otype == 'complex':
+            result = numpy.fft.ifft(data, axis=-1)
+        elif self.itype == 'complex' and self.otype == 'real':
+            result = numpy.fft.irfft(data, n=self.size, axis=-1)
+        else:
+            raise ValueError(_INV_FFT_MSG.format("IFFT", self.itype, self.otype))
+        self.outvec.data[:] = (result * self.size).reshape(-1).astype(self.outvec.dtype)

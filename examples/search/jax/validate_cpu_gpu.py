@@ -4,6 +4,7 @@
 Default: require a GPU, test IMRPhenomD (ripplegw) and regular LAL TaylorF2
 on eight valid seconds of colored noise and noise plus an injection. See
 GPU_TESTS.md for P100 installation and output interpretation. No MPI needed.
+Native CPU transforms use FFTW by default; --fft-backend numpy is optional.
 """
 import argparse
 import csv
@@ -49,6 +50,23 @@ def command_output(command):
         return p.stdout.strip() if p.returncode == 0 else p.stderr.strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return str(exc)
+
+
+def select_native_fft_backend(name):
+    """Require the requested CPU FFT backend, without PyCBC's fallback list."""
+    from pycbc.fft import backend_cpu, backend_support
+    if name not in backend_cpu._alist:
+        raise RuntimeError(
+            f'Requested native CPU FFT backend {name!r} is unavailable. '
+            'For FFTW, install both single- and double-precision FFTW libraries '
+            '(micromamba install -p "$JAX_ENV_PREFIX" -c conda-forge fftw). '
+            'Alternatively select --fft-backend numpy explicitly.')
+    backend_support.set_backend([name])
+    module = backend_support.get_backend().__name__
+    expected = {'fftw': 'pycbc.fft.fftw', 'numpy': 'pycbc.fft.npfft'}[name]
+    if module != expected:
+        raise RuntimeError(f'FFT backend selection failed: expected {expected}, got {module}')
+    return dict(name=name, module=module, cpu_threads=1)
 
 
 def timed(call, repeats):
@@ -484,6 +502,7 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
                     arrays[name+'_control_'+key+'_curve'] = control_curves[name][key]
         np.savez_compressed(directory/'arrays.npz', **arrays)
     report = dict(model=model, templates=len(templates), dataset=directory.name,
+        native_fft_backend=args.fft_backend,
         fft_length=ntime, valid_length=stop-start, waveform_sources=dict(
             TaylorF2='regular LAL TaylorF2, copied to the selected filter device',
             IMRPhenomD='ripplegw generated under the selected JAX device context'),
@@ -503,6 +522,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--gpu', choices=['required', 'optional', 'off'], default='required')
     parser.add_argument('--gpu-index', type=int, default=0, help='Index within CUDA_VISIBLE_DEVICES')
+    parser.add_argument('--fft-backend', choices=['fftw', 'numpy'], default='fftw',
+        help='Native CPU FFT backend for serial/batch filtering and data preparation (default: fftw); JAX FFTs are unchanged')
     parser.add_argument('--approximants', nargs='+', choices=['IMRPhenomD', 'TaylorF2'], default=['IMRPhenomD', 'TaylorF2'])
     parser.add_argument('--bank-sizes', type=int, nargs='+', default=[10, 20])
     parser.add_argument('--repeats', type=int, default=11)
@@ -562,6 +583,8 @@ def main():
             raise RuntimeError('ripplegw IMRPhenomD is required; install ripplegw==0.5.1')
         rows = fixture.draw_rows(max(args.bank_sizes), np.random.default_rng(args.seed))
         with CPUScheme(num_threads=1):
+            report['native_fft_backend'] = select_native_fft_backend(args.fft_backend)
+            print('Native CPU FFT backend: ' + report['native_fft_backend']['module'], flush=True)
             for model in args.approximants:
                 for count in args.bank_sizes:
                     directory = args.output / model / ('n'+str(count))
@@ -590,6 +613,7 @@ def main():
             for case in report['cases']:
                 for mode, values in case[kind].items():
                     rows.append(dict(model=case['model'], templates=case['templates'],
+                        native_fft_backend=case['native_fft_backend'],
                         dataset=case['dataset'], mode=mode, **values))
             if rows:
                 keys = sorted(set().union(*(r.keys() for r in rows)))

@@ -5,6 +5,8 @@ batch, JAX CPU serial, JAX CPU batch, JAX GPU serial, and JAX GPU batch**.
 No MPI launcher, frame files, network downloads, or production search service
 is needed. This checks filtering, template generation, peak selection and
 vetoes; it does not launch the entire live/offline search executables.
+The native CPU reference now explicitly defaults to FFTW. Use
+`--fft-backend numpy` to select NumPy for a separate comparison run.
 
 ## Install on the GPU machine
 
@@ -41,6 +43,19 @@ nvidia-smi
 python -c "import jax; print(jax.__version__); print(jax.devices('gpu'))"
 ```
 
+For a micromamba environment on scratch, install FFTW in that environment:
+
+```bash
+micromamba install -y -p "$JAX_ENV_PREFIX" -c conda-forge fftw
+micromamba activate "$JAX_ENV_PREFIX"
+```
+
+PyCBC requires both `libfftw3` and `libfftw3f` (double/single precision),
+and searches the active Python prefix's `lib` directory. FFTW is a native
+library dependency, so installing the Python requirements alone does not
+ensure it is present. The runner errors if FFTW is requested but unavailable;
+it never silently substitutes NumPy.
+
 **Select CUDA 12 explicitly.** P100 is compute capability 6.0. JAX's CUDA 12
 distribution supports SM >= 5.2; its CUDA 13 distribution requires SM >= 7.5,
 which excludes P100. JAX documents Linux driver >= 525 for CUDA 12. The
@@ -74,9 +89,33 @@ python examples/search/jax/validate_cpu_gpu.py \
 # Full requested matrix: 10 and 20 random aligned-spin templates, both models,
 # eight valid seconds of noise and noise+injection; 11 warm repetitions.
 python examples/search/jax/validate_cpu_gpu.py \
-  --gpu required --bank-sizes 10 20 --repeats 11 --veto-samples 65 \
+  --gpu required --fft-backend fftw \
+  --bank-sizes 10 20 --repeats 11 --veto-samples 65 \
   --output examples/search/jax/validation_results_p100
 ```
+
+To compare native FFTW and NumPy references, run both into separate output
+directories (same seed and bank arguments):
+
+```bash
+for backend in fftw numpy; do
+  python examples/search/jax/validate_cpu_gpu.py \
+    --gpu required --fft-backend "$backend" --bank-sizes 10 20 \
+    --output "$JAX_WORK/results/p100_$backend"
+done
+```
+
+`--fft-backend` selects PyCBC's native serial/batched inverse transforms,
+the exact-waveform CPU controls, and CPU transforms used to prepare fixtures.
+JAX CPU/GPU modes continue using JAX/XLA FFTs; this option does not replace
+JAX's FFT with a host FFTW call. JAX's `jnp.fft` API is distinct from the
+NumPy CPU reference backend. Backend choice can cause small differences in
+generated data from conditioning roundoff between runs; within each run,
+all modes receive exactly the same data. The selected backend module is
+printed and saved in `summary.json`, with the backend name in each case and
+both CSV files. NumPy's batched inverse path reshapes the workspace into
+independent template rows so it does not transform concatenated templates
+as one long sequence.
 
 Run directly, not with `mpirun`: the script compares all modes in one process.
 The seed is fixed at 20261116; the 10-template bank is a prefix of the
@@ -238,7 +277,8 @@ For regression tests, including failure detection and CPU-only artifact checks:
 ```bash
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. \
   python -m pytest -q test/test_jax_live_filter.py \
-    test/test_jax_search_workflows.py test/test_jax_cpu_gpu_validation.py
+    test/test_jax_search_workflows.py test/test_jax_cpu_gpu_validation.py \
+    test/test_npfft_batch.py
 ```
 
 Ten or twenty short templates can be too little work to amortize GPU launch
