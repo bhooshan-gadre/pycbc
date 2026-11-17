@@ -1,12 +1,17 @@
 # CPU acceptance run for the P100 test runner
 
 This is a **CPU-only** run, not a P100 benchmark or GPU validation.
+It is a historical first-template-only run. The current runner defaults to
+separate injections for every template; select `--injection-templates first`
+to reproduce the former coverage. Current output folders use
+`injection_t0000` rather than `injection`.
 
-Command from the repository root (Python 3.12 virtual environment):
+Equivalent coverage with the current runner (Python 3.12 virtual environment):
 
 ```bash
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. \
   python examples/search/jax/validate_cpu_gpu.py --gpu off --repeats 11 \
+    --injection-templates first \
     --output /tmp/pycbc-p100-final
 ```
 

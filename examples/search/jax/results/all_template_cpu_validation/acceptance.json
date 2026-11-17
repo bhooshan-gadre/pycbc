@@ -1,0 +1,151 @@
+{
+  "overall_status": "FAIL",
+  "gpu_tested": false,
+  "source_summary_sha256": "44c762189de02fc22518b1d3ca605fd9803fbc6545fbd991390d02873db7ce48",
+  "source_parent_commit": "f657dd76249d39a43dbde3bc9cb518f82ae6ddd9",
+  "arguments": {
+    "gpu": "off",
+    "gpu_index": 0,
+    "fft_backend": "fftw",
+    "approximants": [
+      "IMRPhenomD",
+      "TaylorF2"
+    ],
+    "bank_sizes": [
+      10,
+      20
+    ],
+    "repeats": 1,
+    "veto_samples": 9,
+    "seed": 20261116,
+    "sample_rate": 2048,
+    "f_lower": 20,
+    "injection_snr": 20,
+    "injection_templates": "all",
+    "no_arrays": true,
+    "output": "/tmp/pycbc-every-template-final"
+  },
+  "versions": {
+    "pycbc": "0.0a9271",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "jax-cuda12-plugin": null,
+    "jax-cuda13-plugin": null,
+    "ripplegw": "0.5.1",
+    "numpy": "2.3.5",
+    "scipy": "1.16.3"
+  },
+  "native_fft_backend": {
+    "name": "fftw",
+    "module": "pycbc.fft.fftw",
+    "cpu_threads": 1
+  },
+  "cases": 64,
+  "injection_cases": 60,
+  "noise_cases": 4,
+  "injection_recovery_checks": 240,
+  "passed_injection_recovery_checks": 240,
+  "minimum_recovered_peak_snr": 17.819026947021484,
+  "maximum_recovered_peak_snr": 22.618366241455078,
+  "minimum_snr_at_injection": 17.819028854370117,
+  "exact_waveform_kernel_controls": 128,
+  "passed_kernel_controls": 128,
+  "max_kernel_complex_snr_error": 4.264961199760036e-06,
+  "all_jax_serial_batch_checks_passed": true,
+  "failures": [
+    "IMRPhenomD/n10/injection_t0008: jax_cpu_serial: chisq peak parity gate failed",
+    "IMRPhenomD/n10/injection_t0008: jax_cpu_batch: chisq peak parity gate failed",
+    "IMRPhenomD/n20/injection_t0008: jax_cpu_serial: chisq peak parity gate failed",
+    "IMRPhenomD/n20/injection_t0008: jax_cpu_batch: chisq peak parity gate failed"
+  ],
+  "coverage": [
+    {
+      "model": "IMRPhenomD",
+      "bank_size": 10,
+      "injected_template_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "all_recovery_checks_passed": true
+    },
+    {
+      "model": "IMRPhenomD",
+      "bank_size": 20,
+      "injected_template_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "all_recovery_checks_passed": true
+    },
+    {
+      "model": "TaylorF2",
+      "bank_size": 10,
+      "injected_template_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "all_recovery_checks_passed": true
+    },
+    {
+      "model": "TaylorF2",
+      "bank_size": 20,
+      "injected_template_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "all_recovery_checks_passed": true
+    }
+  ]
+}

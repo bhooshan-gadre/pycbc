@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -72,7 +73,18 @@ def test_cpu_smoke_outputs_eight_second_arrays_and_plots(tmp_path, backend):
     assert result.returncode == 0, result.stdout + result.stderr
     summary = json.loads((tmp_path/'summary.json').read_text())
     assert summary['status'] == 'PASS_CPU_ONLY_GPU_NOT_TESTED'
-    assert len(summary['cases']) == 2
+    assert len(summary['cases']) == 3
+    injections = [case for case in summary['cases'] if case['injection']]
+    assert {case['injection']['template_id'] for case in injections} == {0, 1}
+    for case in injections:
+        assert case['representative_template_id'] == case['injection']['template_id']
+        assert all(t['engine_reused'] for t in case['timings'].values())
+        for check in case['injection_checks'].values():
+            assert check['passed']
+            assert check['snr_at_injection_time'] >= 10
+            assert check['recovered_peak_snr'] >= 10
+    assert 'N/A (reference compared with itself)' in result.stdout
+    assert 'exactly_equal=True' in result.stdout
     assert summary['native_fft_backend']['name'] == backend
     assert summary['native_fft_backend']['module'] == 'pycbc.fft.' + {'fftw': 'fftw', 'numpy': 'npfft'}[backend]
     assert 'native_fft_backend' in (tmp_path/'timings.csv').read_text().splitlines()[0]
@@ -98,3 +110,100 @@ def test_unavailable_fftw_is_an_error_not_a_numpy_fallback(monkeypatch):
     monkeypatch.setattr(backend_cpu, '_alist', ['numpy'])
     with pytest.raises(RuntimeError, match='FFTW.*install both single- and double-precision'):
         validation.select_native_fft_backend('fftw')
+
+
+def test_zero_residual_is_exact_equality_of_independent_arrays():
+    result = dict(snr=np.array([1.]), chisq=np.array([1.]),
+        sg_chisq=np.array([1.]), coa_phase=np.array([0.]),
+        end_time=np.array([5.]), chisq_dof=np.array([14]))
+    reference = np.ones((1, 32), dtype=np.complex128)
+    actual = reference.copy()
+    metrics, errors = validation.compare_products(result, result, reference, actual, 2048)
+    assert not errors
+    assert metrics['max_complex_snr_error'] == 0
+    assert metrics['surface_exactly_equal']
+    assert metrics['unequal_complex_snr_samples'] == 0
+    assert not metrics['surface_shares_memory_with_reference']
+    actual[0, 1] += 1e-10j
+    metrics, errors = validation.compare_products(result, result, reference, actual, 2048)
+    assert not errors
+    assert not metrics['surface_exactly_equal']
+    assert metrics['unequal_complex_snr_samples'] == 1
+    assert metrics['max_imag_snr_error'] == pytest.approx(1e-10)
+    assert metrics['max_real_snr_error'] == 0
+
+
+@pytest.mark.parametrize('bad_snr', [9.99, np.nan])
+def test_injection_gate_checks_injected_id_and_every_mode(bad_snr):
+    # Row 0 is deliberately loud: it must not mask a weak injected row 1.
+    good = dict(result=dict(snr=np.array([20., 15.])),
+                rho=np.array([[20., 20.], [15., 15.]], dtype=np.complex64))
+    bad = dict(result=dict(snr=np.array([20., bad_snr])),
+               rho=np.array([[20., 20.], [bad_snr, bad_snr]], dtype=np.complex64))
+    checks, failures = validation.check_injection(
+        dict(native_serial=good, jax_gpu_batch=bad), [42, 7],
+        dict(template_id=7, valid_sample_index=1))
+    assert checks['native_serial']['passed']
+    assert not checks['jax_gpu_batch']['passed']
+    assert len(failures) == 1 and 'jax_gpu_batch' in failures[0]
+
+
+def test_minimum_requested_snr_is_boosted_and_recovered(tmp_path):
+    result = run(tmp_path, '--gpu', 'off', '--approximants', 'TaylorF2',
+                 '--bank-sizes', '1', '--repeats', '1', '--veto-samples', '3',
+                 '--injection-snr', '10', '--fft-backend', 'numpy', '--no-arrays')
+    assert result.returncode == 0, result.stdout + result.stderr
+    summary = json.loads((tmp_path/'summary.json').read_text())
+    case = summary['cases'][1]
+    assert case['injection']['requested_optimal_snr'] == 10
+    assert case['injection']['amplitude_boosted']
+    assert case['injection']['optimal_snr_used'] >= 11
+    assert all(c['passed'] for c in case['injection_checks'].values())
+
+
+def test_reject_requested_snr_below_ten(tmp_path):
+    result = run(tmp_path, '--injection-snr', '9')
+    assert result.returncode == 2 and 'minimum 10' in result.stderr
+
+
+def test_adjacent_peak_vetoes_are_compared_at_the_same_sample():
+    reference = dict(snr=np.array([1.]), chisq=np.array([1.]),
+        sg_chisq=np.array([1.]), coa_phase=np.array([.2]),
+        end_time=np.array([4/2048]), chisq_dof=np.array([14]))
+    actual = {k: v.copy() for k, v in reference.items()}
+    actual['end_time'][0] = 5/2048
+    actual['coa_phase'][0] = .4
+    actual['chisq'][0] = 2
+    actual['sg_chisq'][0] = 3
+    rho = np.ones((1, 32), dtype=np.complex128)
+    rho[0, 4:6] = np.exp(1j*np.array([.2, .4]))
+    called = []
+    def evaluator(row, index):
+        called.append((row, index))
+        return 1., 1.
+    aligned, changed = validation.align_peak_vetoes(
+        dict(result=actual, rho=rho), reference, [7],
+        SimpleNamespace(start_time=0, sample_rate=2048), 100, evaluator)
+    assert changed == [7] and called == [(0, 104)]
+    metrics, failures = validation.compare_products(reference, actual,
+        rho.copy(), rho, 2048, actual_at_reference_peak=aligned)
+    assert not failures
+    assert metrics['max_chisq_error'] == 1
+    assert metrics['max_same_time_chisq_error'] == 0
+    assert metrics['max_peak_phase_error_rad'] == pytest.approx(.2)
+    assert metrics['max_same_time_phase_error_rad'] < 1e-12
+    assert metrics['max_peak_time_error_samples'] == 1
+    assert actual['chisq'][0] == 2  # Original peak outputs are retained.
+
+
+@pytest.mark.parametrize('field', ['chisq', 'coa_phase'])
+def test_same_time_comparison_cannot_hide_nonfinite_original_peaks(field):
+    reference = dict(snr=np.array([1.]), chisq=np.array([1.]),
+        sg_chisq=np.array([1.]), coa_phase=np.array([0.]),
+        end_time=np.array([5.]), chisq_dof=np.array([14]))
+    actual = {key: value.copy() for key, value in reference.items()}
+    actual[field][0] = np.nan
+    rho = np.ones((1, 32), dtype=np.complex64)
+    metrics, errors = validation.compare_products(reference, actual,
+        rho.copy(), rho, 2048, actual_at_reference_peak=reference)
+    assert not metrics['passed'] and any('nonfinite original' in error for error in errors)

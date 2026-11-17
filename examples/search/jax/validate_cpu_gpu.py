@@ -2,7 +2,8 @@
 """Validate native/JAX serial and batched filtering, including real GPU execution.
 
 Default: require a GPU, test IMRPhenomD (ripplegw) and regular LAL TaylorF2
-on eight valid seconds of colored noise and noise plus an injection. See
+on eight valid seconds of colored noise and separate injections for every
+bank template. Every injected signal must recover SNR >= 10 in all modes. See
 GPU_TESTS.md for P100 installation and output interpretation. No MPI needed.
 Native CPU transforms use FFTW by default; --fft-backend numpy is optional.
 """
@@ -24,6 +25,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'examples/live'))
 
 import numpy as np
+
+MIN_INJECTION_SNR = 10.0
 
 
 def clean(value):
@@ -91,28 +94,54 @@ def aligned_result(result, ids):
                         'chisq', 'chisq_dof', 'sg_chisq']}
 
 
-def compare_products(reference, actual, rho_ref, rho, sample_rate, surface_atol=1e-3):
+def compare_products(reference, actual, rho_ref, rho, sample_rate, surface_atol=1e-3,
+                     actual_at_reference_peak=None):
     """Gate scientific parity; retain failures instead of aborting plotting."""
     errors, metrics = [], {}
     if not np.isfinite(rho).all():
         errors.append('nonfinite SNR surface')
-    delta = np.abs(rho - rho_ref)
+    # Subtract in complex128 so diagnostic accumulation does not introduce
+    # additional complex64 rounding. This cannot recover bits absent from
+    # the original surfaces, and exact equality is a legitimate outcome.
+    difference = np.asarray(rho, dtype=np.complex128)-np.asarray(rho_ref, dtype=np.complex128)
+    delta = np.abs(difference)
     allowed = surface_atol + 1e-4 * np.maximum(np.abs(rho_ref), 1)
     metrics['complex_snr_absolute_tolerance'] = surface_atol
     metrics['max_complex_snr_error'] = float(np.max(delta))
+    metrics['max_real_snr_error'] = float(np.max(np.abs(difference.real)))
+    metrics['max_imag_snr_error'] = float(np.max(np.abs(difference.imag)))
+    metrics['surface_exactly_equal'] = bool(np.array_equal(rho, rho_ref))
+    metrics['unequal_complex_snr_samples'] = int(np.count_nonzero(delta))
+    metrics['complex_snr_samples'] = int(delta.size)
+    metrics['surface_shares_memory_with_reference'] = bool(np.shares_memory(rho, rho_ref))
+    metrics['reference_surface_max_snr'] = float(np.max(np.abs(rho_ref)))
+    metrics['actual_surface_max_snr'] = float(np.max(np.abs(rho)))
+    metrics['reference_surface_nonzero_samples'] = int(np.count_nonzero(rho_ref))
+    metrics['actual_surface_nonzero_samples'] = int(np.count_nonzero(rho))
     metrics['rms_complex_snr_error'] = float(np.sqrt(np.mean(delta**2)))
     metrics['max_snr_magnitude_error'] = float(np.max(np.abs(np.abs(rho)-np.abs(rho_ref))))
     if not np.all(delta <= allowed):
         errors.append(f'complex SNR surface exceeds {surface_atol:g} absolute + 1e-4 relative gate')
+    at_reference = actual if actual_at_reference_peak is None else actual_at_reference_peak
     for key in ['snr', 'chisq', 'sg_chisq']:
         x, y = reference[key], actual[key]
+        if not np.isfinite(y).all():
+            errors.append(key + ' has nonfinite original peak values')
         d = np.abs(y-x)
         metrics['max_' + key + '_error'] = float(np.max(d))
+        if key != 'snr':
+            y = at_reference[key]
+            d = np.abs(y-x)
+            metrics['max_same_time_' + key + '_error'] = float(np.max(d))
         atol = np.where(x < 5, 1e-3, 0) if key == 'snr' else 1e-3
         if not np.isfinite(y).all() or not np.all(d <= atol + 1e-4*np.maximum(np.abs(x), 1)):
             errors.append(key + ' peak parity gate failed')
     phase_error = np.abs(np.angle(np.exp(1j*(actual['coa_phase']-reference['coa_phase']))))
     metrics['max_peak_phase_error_rad'] = float(np.max(phase_error))
+    if not np.isfinite(actual['coa_phase']).all():
+        errors.append('nonfinite original peak phase')
+    phase_error = np.abs(np.angle(np.exp(1j*(at_reference['coa_phase']-reference['coa_phase']))))
+    metrics['max_same_time_phase_error_rad'] = float(np.max(phase_error))
     dt = np.abs(actual['end_time']-reference['end_time']) * sample_rate
     metrics['max_peak_time_error_samples'] = float(np.max(dt))
     if not np.isfinite(phase_error).all() or np.max(phase_error) > 1e-3:
@@ -123,6 +152,31 @@ def compare_products(reference, actual, rho_ref, rho, sample_rate, surface_atol=
         errors.append('chi-squared degrees of freedom differ')
     metrics['passed'] = not errors
     return metrics, errors
+
+
+def align_peak_vetoes(product, reference_result, ids, reader, start, evaluator):
+    """Compare phase/vetoes at one physical sample for adjacent tied peaks.
+
+    Retain original optimized SNR and peak time. Only phase and veto columns
+    are reevaluated, and only for a peak displaced by the allowed one sample.
+    Larger displacements still fail the independent peak-time gate.
+    """
+    actual = product['result']
+    aligned = {key: np.array(value, copy=True) for key, value in actual.items()}
+    changed = []
+    for row, tid in enumerate(ids):
+        offset = abs(actual['end_time'][row]-reference_result['end_time'][row])*reader.sample_rate
+        if not .25 < offset <= 1.0001:
+            continue
+        sample = int(round((reference_result['end_time'][row]-reader.start_time)*reader.sample_rate))
+        if not 0 <= sample < product['rho'].shape[1]:
+            continue
+        aligned['coa_phase'][row] = np.angle(product['rho'][row, sample])
+        power, sg = evaluator(row, start+sample)
+        aligned['chisq'][row] = power
+        aligned['sg_chisq'][row] = sg
+        changed.append(int(tid))
+    return aligned, changed
 
 
 def compare_curves(reference, actual):
@@ -137,6 +191,27 @@ def compare_curves(reference, actual):
         if not passed:
             errors.append('sampled ' + key + ' veto time-series gate failed')
     return metrics, errors
+
+
+def check_injection(products, ids, injection):
+    """Require a strong recovered signal in every implementation, by ID."""
+    checks, failures = {}, []
+    if injection is None:
+        return checks, failures
+    tid = injection['template_id']
+    row, sample = ids.index(tid), injection['valid_sample_index']
+    for name, product in products.items():
+        at_time = float(abs(product['rho'][row, sample]))
+        peak = float(product['result']['snr'][row])
+        passed = bool(np.isfinite([at_time, peak]).all()
+                      and min(at_time, peak) >= MIN_INJECTION_SNR)
+        checks[name] = dict(template_id=tid, snr_at_injection_time=at_time,
+            recovered_peak_snr=peak, minimum_required_snr=MIN_INJECTION_SNR,
+            passed=passed)
+        if not passed:
+            failures.append(f'{name}: injected template {tid} must recover SNR >= '
+                            f'{MIN_INJECTION_SNR:g}; peak={peak:g}, at injection={at_time:g}')
+    return checks, failures
 
 
 def build_fixture(args, model, rows, directory):
@@ -158,22 +233,38 @@ def build_fixture(args, model, rows, directory):
     stilde = f.overwhiten(np.asarray(noise), psd)
     reader = f.make_reader(stilde)
     start, stop = f.valid_bounds(templates[0], reader)
-    # Native frequency-domain bank injection, independent of ripplegw/JAX.
-    # Alpha sets the optimal SNR; noise changes its recovered value.
+    # Separate native FD injection for each requested template, with the
+    # same unchanged noise realization. Never inject the bank simultaneously.
     from pycbc.types import FrequencySeries
-    h = np.asarray(templates[0])
-    sigma2 = float(templates[0].sigmasq(stilde.psd))
-    alpha = args.injection_snr / np.sqrt(sigma2)
+    from pycbc.filter import matched_filter_core
     target_index = start + int(5 * args.sample_rate)
-    phase = np.exp(-2j*np.pi*np.arange(len(h))*target_index/ntime)
-    addition = np.zeros(len(h), dtype=np.complex128)
+    phase = np.exp(-2j*np.pi*np.arange(len(templates[0]))*target_index/ntime)
     weight = np.asarray(stilde.psd)
     good = weight > 0
-    addition[good] = alpha*h[good]*phase[good]/weight[good]
-    injected = FrequencySeries((np.asarray(stilde)+addition).astype(np.complex64),
-                              delta_f=df, epoch=stilde.epoch)
-    injected.psd = stilde.psd
-    readers = {'noise': reader, 'injection': f.make_reader(injected)}
+    readers = {'noise': reader}
+    selected = templates if args.injection_templates == 'all' else templates[:1]
+    for template in selected:
+        h = np.asarray(template)
+        sigma2 = float(template.sigmasq(stilde.psd))
+        noise_raw, _, norm = matched_filter_core(template, stilde, h_norm=sigma2)
+        noise_peak = complex(np.asarray(noise_raw)[target_index]*norm)
+        # Triangle inequality gives recovered SNR >=11 in the native model
+        # before rounding, even if this noise sample opposes the signal.
+        # The 1-SNR margin also accommodates cross-model/device residuals.
+        optimal = max(args.injection_snr, MIN_INJECTION_SNR+1+abs(noise_peak))
+        addition = np.zeros(len(h), dtype=np.complex128)
+        addition[good] = optimal/np.sqrt(sigma2)*h[good]*phase[good]/weight[good]
+        injected = FrequencySeries((np.asarray(stilde)+addition).astype(np.complex64),
+                                  delta_f=df, epoch=stilde.epoch)
+        injected.psd = stilde.psd
+        injected_reader = f.make_reader(injected)
+        injected_reader.injection = dict(template_id=int(template.id),
+            valid_sample_index=target_index-start, time_s=5.0,
+            requested_optimal_snr=args.injection_snr, optimal_snr_used=optimal,
+            amplitude_boosted=optimal > args.injection_snr,
+            noise_complex_snr_at_injection=[noise_peak.real, noise_peak.imag],
+            minimum_required_snr=MIN_INJECTION_SNR)
+        readers[f'injection_t{int(template.id):04d}'] = injected_reader
     return bank, templates, readers, start, stop
 
 
@@ -352,12 +443,15 @@ def draw_plots(directory, model, dataset, ids, representative, times, products,
     fig.savefig(directory/'surface.png', dpi=130); plt.close(fig)
 
 
-def run_case(args, model, bank, templates, reader, start, stop, directory, devices):
+def run_case(args, model, bank, templates, reader, start, stop, directory, devices,
+             workspace=None):
     import jax
     from pycbc.filter import LiveBatchMatchedFilter
     from pycbc.filter.jax_matchedfilter import JaxLiveBatchMatchedFilter, _approximant_name
     from pycbc.vetoes.sgchisq import SingleDetSGChisq
     ids = [int(t.id) for t in templates]
+    injection = getattr(reader, 'injection', None)
+    workspace = {} if workspace is None else workspace
     def sg():
         return SingleDetSGChisq(bank, num_bins='8', snr_threshold=4,
                                chisq_locations=['mtotal>0:10-0'])
@@ -374,22 +468,33 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
             report['generation_device'] = str(jax.config.jax_default_device)
             return generated, report
     products, timings, metadata, failures = {}, {}, {}, []
-    controls, control_curves = {}, {}
-    serial = NativeSerial(templates, reader, sg())
+    controls, control_curves, engine_links = {}, {}, {}
+    began = time.perf_counter()
+    reused = 'native_serial' in workspace
+    if not reused:
+        workspace['native_serial'] = NativeSerial(templates, reader, sg())
+    serial = workspace['native_serial']
+    serial.reader = reader
+    setup = 0 if reused else time.perf_counter()-began
     result, timing = timed(serial.run, args.repeats)
     result, rho, packs = serial.run(collect=True)
     products['native_serial'] = dict(result=aligned_result(result, ids), rho=rho)
-    timings['native_serial'] = dict(setup_s=0, **timing)
-    batch = LiveBatchMatchedFilter(list(templates), snr_threshold=0, chisq_bins='8', sg_chisq=sg())
+    timings['native_serial'] = dict(setup_s=setup, engine_reused=reused, **timing)
+    began = time.perf_counter()
+    reused = 'native_batch' in workspace
+    if not reused:
+        workspace['native_batch'] = LiveBatchMatchedFilter(list(templates), snr_threshold=0, chisq_bins='8', sg_chisq=sg())
+    batch = workspace['native_batch']
+    setup = 0 if reused else time.perf_counter()-began
     result, timing = timed(lambda: batch.process_data(reader), args.repeats)
     surfaces = {}
     for template in templates:
         norm = 4*template.delta_f/np.sqrt(template.sigmasq(reader._stilde.psd))
         surfaces[int(template.id)] = (np.asarray(template.out)[start:stop]*np.float32(norm)).copy()
     products['native_batch'] = dict(result=aligned_result(result, ids), rho=np.stack([surfaces[i] for i in ids]))
-    timings['native_batch'] = dict(setup_s=0, **timing)
+    timings['native_batch'] = dict(setup_s=setup, engine_reused=reused, **timing)
     native = products['native_serial']
-    representative = ids[0] if directory.name == 'injection' else ids[int(np.argmax(native['result']['snr']))]
+    representative = injection['template_id'] if injection else ids[int(np.argmax(native['result']['snr']))]
     ri = ids.index(representative)
     peak = start + int(round((native['result']['end_time'][ri]-reader.start_time)*args.sample_rate))
     points = np.unique(np.concatenate([np.linspace(start, stop-1, args.veto_samples).astype(int),
@@ -403,21 +508,37 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
     pcurve, scurve = native_curves(serial, pack, templates[ri], points)
     curves['native_batch'] = dict(power=pcurve, sg=scurve)
     ntime = (len(templates[0])-1)*2
+    def evaluate_mode(name, row, index):
+        if name.startswith('jax_'):
+            engine = workspace[name]
+            with jax.default_device(engine.device):
+                pc, sc = jax_curves(engine, engine_links[name][ids[row]],
+                    np.array([index]), engine.device, chunk=1)
+        else:
+            template = templates[row]
+            norm = 4*template.delta_f/np.sqrt(template.sigmasq(reader._stilde.psd))
+            pack = (np.asarray(template.out), np.asarray(template.cout), norm)
+            pc, sc = native_curves(serial, pack, template, np.array([index]))
+        return pc[0], sc[0]
     for platform_name, device in devices.items():
         for mode in ['serial', 'batch']:
             name = 'jax_' + platform_name + '_' + mode
             with jax.default_device(device):
                 began = time.perf_counter()
-                engine = ValidationFilter(list(templates), snr_threshold=0,
-                    chisq_bins='8', sg_chisq=sg(), jax_platform=platform_name,
-                    processing_device_id=device.id, maxelements=ntime if mode == 'serial' else 2**27)
-                setup = time.perf_counter()-began
+                reused = name in workspace
+                if not reused:
+                    workspace[name] = ValidationFilter(list(templates), snr_threshold=0,
+                        chisq_bins='8', sg_chisq=sg(), jax_platform=platform_name,
+                        processing_device_id=device.id, maxelements=ntime if mode == 'serial' else 2**27)
+                engine = workspace[name]
+                setup = 0 if reused else time.perf_counter()-began
                 if engine.device != device:
                     raise AssertionError('Unexpected device fallback')
                 result, timing = timed(lambda: engine.process_data(reader), args.repeats)
                 rho, chosen, links = engine_surface(engine, ids, start, stop, device)
+                engine_links[name] = links
                 products[name] = dict(result=aligned_result(result, ids), rho=rho)
-                timings[name] = dict(setup_s=setup, **timing)
+                timings[name] = dict(setup_s=setup, engine_reused=reused, **timing)
                 metadata[name] = dict(device=str(device), device_kind=device.device_kind,
                     chunks=[int(x) for x in engine.chunks], waveforms=engine.startup_comparisons)
                 pcurve, scurve = jax_curves(engine, links[representative], points, device)
@@ -430,21 +551,33 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
                 controls[name] = dict(result=control_result, rho=control_rho)
                 pc, sc = native_curves(control, control_packs[ri], templates[ri], points)
                 control_curves[name] = dict(power=pc, sg=sc)
+                aligned, changed = align_peak_vetoes(products[name], control_result,
+                    ids, reader, start, lambda row, index: evaluate_mode(name, row, index))
                 filter_metrics, errors = compare_products(control_result,
-                    products[name]['result'], control_rho, rho, args.sample_rate)
+                    products[name]['result'], control_rho, rho, args.sample_rate,
+                    actual_at_reference_peak=aligned)
+                filter_metrics['same_time_reevaluated_template_ids'] = changed
                 curve_metrics, curve_errors = compare_curves(control_curves[name], curves[name])
                 filter_metrics.update(curve_metrics)
                 errors.extend(curve_errors)
                 filter_metrics['passed'] = not errors
+                filter_metrics['reference_mode'] = 'native_serial_exact_waveform'
+                filter_metrics['self_comparison'] = False
                 metadata[name]['filter_only'] = filter_metrics
                 failures.extend([name + ' filter-only: ' + e for e in errors])
                 del control, engine
     metrics = {}
     for name, product in products.items():
         model_comparison = model == 'IMRPhenomD' and name.startswith('jax_')
+        aligned, changed = align_peak_vetoes(product, native['result'], ids, reader,
+            start, lambda row, index: evaluate_mode(name, row, index))
         m, errors = compare_products(native['result'], product['result'], native['rho'], product['rho'],
-            args.sample_rate, surface_atol=5e-3 if model_comparison else 1e-3)
+            args.sample_rate, surface_atol=5e-3 if model_comparison else 1e-3,
+            actual_at_reference_peak=aligned)
+        m['same_time_reevaluated_template_ids'] = changed
         metrics[name] = m
+        m['reference_mode'] = 'native_serial'
+        m['self_comparison'] = name == 'native_serial'
         failures.extend([name + ': ' + e for e in errors])
         cm, ce = compare_curves(curves['native_serial'], curves[name])
         m.update(cm)
@@ -464,14 +597,20 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
     for name, product in products.items():
         if not name.startswith('jax_'):
             continue
+        aligned, changed = align_peak_vetoes(product, baseline['result'], ids, reader,
+            start, lambda row, index: evaluate_mode(name, row, index))
         m, errors = compare_products(baseline['result'], product['result'],
-            baseline['rho'], product['rho'], args.sample_rate)
+            baseline['rho'], product['rho'], args.sample_rate,
+            actual_at_reference_peak=aligned)
+        m['same_time_reevaluated_template_ids'] = changed
         cm, ce = compare_curves(curves['jax_cpu_serial'], curves[name])
         m.update(cm); errors.extend(ce); m['passed'] = not errors
         consistency[name] = m
+        m['reference_mode'] = 'jax_cpu_serial'
+        m['self_comparison'] = name == 'jax_cpu_serial'
         failures.extend([name + ' vs JAX CPU serial: ' + e for e in errors])
-    if directory.name == 'injection' and native['result']['snr'][0] < args.injection_snr*.7:
-        failures.append('Injected template was not recovered with the expected SNR')
+    injection_checks, errors = check_injection(products, ids, injection)
+    failures.extend(errors)
     times = np.arange(stop-start)/args.sample_rate
     curve_times = (points-start)/args.sample_rate
     draw_plots(directory, model, directory.name, ids, representative, times,
@@ -490,6 +629,10 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
     if not args.no_arrays:
         arrays = dict(time_s=times, template_ids=ids, veto_time_s=curve_times,
                       representative_template_id=representative)
+        if injection:
+            arrays['injected_template_id'] = injection['template_id']
+            arrays['injection_time_s'] = injection['time_s']
+            arrays['injection_optimal_snr'] = injection['optimal_snr_used']
         for name, product in products.items():
             arrays[name+'_rho'] = product['rho']
             for key, values in product['result'].items():
@@ -507,6 +650,7 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
             TaylorF2='regular LAL TaylorF2, copied to the selected filter device',
             IMRPhenomD='ripplegw generated under the selected JAX device context'),
         metrics=metrics, timings=timings, implementations=metadata,
+        injection=injection, injection_checks=injection_checks,
         jax_cpu_serial_consistency=consistency,
         representative_template_id=representative, failures=failures, passed=not failures)
     for name, timing in timings.items():
@@ -531,14 +675,17 @@ def main():
     parser.add_argument('--seed', type=int, default=20261116)
     parser.add_argument('--sample-rate', type=int, default=2048)
     parser.add_argument('--f-lower', type=float, default=20)
-    parser.add_argument('--injection-snr', type=float, default=20)
+    parser.add_argument('--injection-snr', type=float, default=20,
+        help='Requested optimal injection SNR (>=10); boosted when needed to keep recovery above 10 in noise')
+    parser.add_argument('--injection-templates', choices=['all', 'first'], default='all',
+        help='Separate eight-second injection for every bank template (default), or only the first for a quick check')
     parser.add_argument('--no-arrays', action='store_true')
     parser.add_argument('--output', type=Path, default=Path(__file__).parent/'validation_results')
     args = parser.parse_args()
     if min(args.bank_sizes) < 1 or args.repeats < 1 or args.veto_samples < 2 or args.gpu_index < 0:
         parser.error('positive bank sizes/repeats, >=2 veto samples, and nonnegative GPU index required')
-    if args.sample_rate < 512 or args.f_lower <= 0 or args.f_lower >= args.sample_rate/2 or args.injection_snr < 8:
-        parser.error('invalid sample rate, f-lower, or injection SNR (minimum 8)')
+    if args.sample_rate < 512 or args.f_lower <= 0 or args.f_lower >= args.sample_rate/2 or not np.isfinite(args.injection_snr) or args.injection_snr < MIN_INJECTION_SNR:
+        parser.error('invalid sample rate, f-lower, or injection SNR (minimum 10)')
     args.output.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault('MPLCONFIGDIR', str(args.output.resolve()/'.matplotlib'))
     os.environ.setdefault('XLA_PYTHON_CLIENT_PREALLOCATE', 'false')
@@ -590,29 +737,60 @@ def main():
                     directory = args.output / model / ('n'+str(count))
                     directory.mkdir(parents=True, exist_ok=True)
                     bank, templates, readers, start, stop = build_fixture(args, model, rows[:count], directory)
+                    workspace = {}
                     for dataset, reader in readers.items():
                         output = directory/dataset
                         output.mkdir(exist_ok=True)
-                        case = run_case(args, model, bank, templates, reader, start, stop, output, devices)
+                        case = run_case(args, model, bank, templates, reader, start, stop, output, devices, workspace)
                         report['cases'].append(case)
-                        report['failures'].extend(case['failures'])
+                        report['failures'].extend(
+                            [f'{model}/n{count}/{dataset}: {failure}' for failure in case['failures']])
                         print(f'{model} n={count} {dataset}: ' + ('PASS' if case['passed'] else 'FAIL'), flush=True)
                         for name, timing in case['timings'].items():
                             metric = case['metrics'][name]
+                            residual = ('N/A (reference compared with itself)' if metric['self_comparison'] else
+                                f"{metric['max_complex_snr_error']:.9e}, "
+                                f"Re/Im={metric['max_real_snr_error']:.9e}/{metric['max_imag_snr_error']:.9e}, "
+                                f"unequal={metric['unequal_complex_snr_samples']}/{metric['complex_snr_samples']}, "
+                                f"exactly_equal={metric['surface_exactly_equal']}")
                             print(f"  {name:18s} median={1000*timing['median_s']:8.3f} ms "
-                                  f"max complex dSNR={metric['max_complex_snr_error']:.3e} "
-                                  f"power/SG dchi2={metric['max_chisq_error']:.3e}/{metric['max_sg_chisq_error']:.3e} "
+                                  f"complex dSNR vs native_serial={residual} "
+                                  f"same-time power/SG dchi2={metric['max_same_time_chisq_error']:.3e}/{metric['max_same_time_sg_chisq_error']:.3e} "
                                   f"native-batch speedup={timing['speedup_vs_native_batch']:.2f}x "
                                   f"peak dt={metric['max_peak_time_error_samples']:.0f} samples", flush=True)
+                            if name in case['injection_checks']:
+                                check = case['injection_checks'][name]
+                                print(f"    injected template={check['template_id']}, "
+                                      f"recovered peak SNR={check['recovered_peak_snr']:.6f}, "
+                                      f"SNR at injection={check['snr_at_injection_time']:.6f}, "
+                                      f"minimum={check['minimum_required_snr']:g}", flush=True)
+                            if metric['same_time_reevaluated_template_ids']:
+                                print(f"    adjacent peak samples for templates={metric['same_time_reevaluated_template_ids']}; "
+                                      f"raw peak phase difference={metric['max_peak_phase_error_rad']:.9e}, "
+                                      f"same-time phase difference={metric['max_same_time_phase_error_rad']:.9e} rad", flush=True)
+                            if name in case['implementations']:
+                                kernel = case['implementations'][name]['filter_only']
+                                cross = case['jax_cpu_serial_consistency'][name]
+                                print(f"    kernel dSNR vs exact-waveform native={kernel['max_complex_snr_error']:.9e}; "
+                                      f"dSNR vs jax_cpu_serial=" + ('N/A (self)' if cross['self_comparison'] else
+                                      f"{cross['max_complex_snr_error']:.9e}, exactly_equal={cross['surface_exactly_equal']}"), flush=True)
                         save_json(args.output/'summary.json', report)
-                        jax.clear_caches()  # Bound accumulation of compiled shapes across cases.
+                    workspace.clear()
+                    jax.clear_caches()  # Reuse compiled shapes across injections within each bank.
         report['gpu_tested'] = 'gpu' in devices
         report['status'] = 'FAIL' if report['failures'] else ('PASS_CPU_GPU' if report['gpu_tested'] else 'PASS_CPU_ONLY_GPU_NOT_TESTED')
         for kind in ['metrics', 'timings']:
             rows = []
             for case in report['cases']:
                 for mode, values in case[kind].items():
+                    check = case['injection_checks'].get(mode, {})
                     rows.append(dict(model=case['model'], templates=case['templates'],
+                        injected_template_id=case['injection']['template_id'] if case['injection'] else None,
+                        injection_optimal_snr=case['injection']['optimal_snr_used'] if case['injection'] else None,
+                        injection_requested_optimal_snr=case['injection']['requested_optimal_snr'] if case['injection'] else None,
+                        injection_peak_snr=check.get('recovered_peak_snr'),
+                        injection_snr_at_time=check.get('snr_at_injection_time'),
+                        injection_snr_passed=check.get('passed'),
                         native_fft_backend=case['native_fft_backend'],
                         dataset=case['dataset'], mode=mode, **values))
             if rows:
