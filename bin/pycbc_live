@@ -960,7 +960,18 @@ parser.add_argument('--filter-backend', choices=['cpu', 'jax'], default='cpu',
                          'JaxLiveBatchMatchedFilter. Rank 0 is unchanged.')
 parser.add_argument('--jax-platform', choices=['cpu', 'gpu'], default='cpu',
                     help='JAX platform for ranks whose filter backend is jax. '
-                         'gpu uses --processing-device-id as the CUDA device.')
+                         'GPU assignment uses --jax-device-id and respects scheduler visibility.')
+parser.add_argument('--jax-device-id', default='auto',
+                    help='auto assigns distinct scheduler-visible GPUs per node; or a visible index')
+parser.add_argument('--jax-allow-gpu-sharing', action='store_true',
+                    help='Explicitly permit multiple filtering ranks on one GPU')
+parser.add_argument('--jax-autotune', action='store_true',
+                    help='Measure first-block full-bank filter/veto latency and choose batch size')
+parser.add_argument('--jax-tuning-candidates', type=int, nargs='+', default=[1, 2, 4, 8, 16, 32, 64])
+parser.add_argument('--jax-tuning-repeats', type=int, default=5)
+parser.add_argument('--jax-memory-budget-mb', type=float)
+parser.add_argument('--jax-max-batch-latency-ms', type=float,
+                    help='Limit measured p95 full-bank latency, including all-template veto stress')
 parser.add_argument('--rank-backend', default=None, metavar='LIST',
                     help='Comma-separated backends cycled across filtering '
                          'ranks (rank 0 is never a filter). '
@@ -1107,6 +1118,12 @@ pycbc.init_logging(
 ctx = scheme.from_cli(args)
 fft.from_cli(args)
 _this_filter_backend = filter_backend_for_rank(args, mpi.COMM_WORLD.Get_rank())
+from pycbc.filter.jax_devices import bind_mpi_gpu
+_jax_binding = bind_mpi_gpu(
+    mpi.COMM_WORLD, _this_filter_backend == 'jax' and args.jax_platform == 'gpu',
+    requested=args.jax_device_id, allow_sharing=args.jax_allow_gpu_sharing)
+if _jax_binding:
+    logging.info('JAX GPU binding: %s', _jax_binding)
 # JAX ranks keep StrainBuffer on the CPU scheme. The scheme object is a
 # process singleton, so a CUDA context cannot be replaced after from_cli.
 if _this_filter_backend == 'jax' and not isinstance(ctx, scheme.CPUScheme):
@@ -1196,7 +1213,12 @@ with ctx:
                 max_triggers_in_batch=args.max_triggers_in_batch,
                 maxelements=args.max_batch_size,
                 jax_platform=args.jax_platform,
-                device_id=args.processing_device_id,
+                device_id=0,
+                autotune=args.jax_autotune,
+                tuning_candidates=args.jax_tuning_candidates,
+                tuning_repeats=args.jax_tuning_repeats,
+                memory_budget_mb=args.jax_memory_budget_mb,
+                max_batch_latency_ms=args.jax_max_batch_latency_ms,
             )
         else:
             mf = LiveBatchMatchedFilter(
@@ -1422,6 +1444,8 @@ with ctx:
 
                     results[ifo]['psd_var_val'] = psd_var_vals
 
+            # A filtering-only run has no coincidence products to dump.
+            best_coinc = {}
             # Look for coincident triggers and do background estimation
             if args.enable_background_estimation:
                 coinc_results = coinc_pool.broadcast(get_coinc, results)

@@ -21,6 +21,7 @@ logger = logging.getLogger('pycbc.waveform.jax_phenom')
 
 _RIPPLE = None
 _RIPPLE_TRIED = False
+_RIPPLE_COMPILED = None
 
 
 def _load_ripple():
@@ -56,7 +57,16 @@ def _ripple_phenomd(length, delta_f, f_lower, f_ref, distance,
     import jax.numpy as jnp
     from pycbc.pnutils import mass1_mass2_to_mchirp_eta
 
+    global _RIPPLE_COMPILED
     gen = _load_ripple()
+    if gen is None:
+        raise RuntimeError('ripplegw IMRPhenomD is unavailable')
+    if _RIPPLE_COMPILED is None:
+        # Reuse one compiled generator across templates. Passing parameters
+        # and f_ref as arrays keeps masses/spins/reference frequency dynamic;
+        # executable variants are keyed by grid shape, dtype and device.
+        _RIPPLE_COMPILED = jax.jit(gen)
+    gen = _RIPPLE_COMPILED
     # Ripple's chirp-mass conversion returns the heavier body first.
     if float(mass1) >= float(mass2):
         chi1, chi2 = float(spin1z), float(spin2z)
@@ -73,7 +83,7 @@ def _ripple_phenomd(length, delta_f, f_lower, f_ref, distance,
         params = jnp.asarray(
             [mc, eta, chi1, chi2, float(distance), 0.0, 0.0, 0.0],
             dtype=jnp.float64)
-        hp, _hc = gen(freqs, params, float(f_ref))
+        hp, _hc = gen(freqs, params, jnp.float64(f_ref))
         h = numpy.asarray(hp).astype(numpy.complex64, copy=True)
     if not numpy.isfinite(h).all():
         # The unused DC bin can be singular; nonfinite in-band strain is an

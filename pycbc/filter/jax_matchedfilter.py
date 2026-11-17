@@ -50,30 +50,14 @@ def _import_jax():
 
 
 def configure_jax(platform='cpu', device_id=0):
-    """Select the JAX platform before the first use in this process.
+    """Select a visible device without modifying scheduler visibility.
 
-    ``device_id`` is the CUDA device index from ``--processing-device-id``.
-    On GPU it is applied with ``CUDA_VISIBLE_DEVICES`` when JAX has not been
-    imported yet, and with ``jax.device_put`` either way.
-
-    Returns
-    -------
-    device : jax device
-    gpu_available : bool
-        False when a GPU was requested but JAX has no CUDA device.
+    GPU requests fail explicitly; CPU and out-of-range GPU fallbacks can
+    silently put multiple filtering ranks on one device and are prohibited.
     """
-    import os
-    import sys
-
     platform = (platform or 'cpu').lower()
     if platform not in ('cpu', 'gpu'):
         raise ValueError("jax platform must be 'cpu' or 'gpu', got %s" % platform)
-
-    if 'jax' not in sys.modules:
-        if platform == 'cpu':
-            os.environ['JAX_PLATFORMS'] = 'cpu'
-        elif device_id is not None:
-            os.environ['CUDA_VISIBLE_DEVICES'] = str(int(device_id))
 
     jax, _jnp = _import_jax()
     try:
@@ -81,16 +65,11 @@ def configure_jax(platform='cpu', device_id=0):
     except AttributeError:
         pass
 
-    gpu_devices = [d for d in jax.devices() if getattr(d, 'platform', '') == 'gpu']
     if platform == 'gpu':
-        if not gpu_devices:
-            logger.warning('JAX GPU requested but jax.devices() has no CUDA device')
-            return jax.devices('cpu')[0], False
+        gpu_devices = jax.devices('gpu')
         index = int(device_id or 0)
-        if index >= len(gpu_devices):
-            logger.warning('processing-device-id %s is outside the visible GPU '
-                           'list (length %s); using GPU 0', index, len(gpu_devices))
-            index = 0
+        if not 0 <= index < len(gpu_devices):
+            raise ValueError(f'GPU index {index} outside {len(gpu_devices)} visible devices')
         return gpu_devices[index], True
     return jax.devices('cpu')[0], True
 
@@ -118,25 +97,21 @@ def _param(template, name, default=None):
 
 
 def _duration_chunks(templates, maxelements):
-    """Same duration grouping as ``LiveBatchMatchedFilter``."""
-    durations = numpy.array([1.0 / t.delta_f for t in templates])
-    lsort = durations.argsort()
-    durations = durations[lsort]
-    templates = [templates[li] for li in lsort]
-
-    _uniq, counts = numpy.unique(durations, return_counts=True)
-    tsamples = [(len(t) - 1) * 2 for t in templates]
-    grabs = maxelements / numpy.unique(tsamples)
-
-    chunks = numpy.array([])
-    num = 0
-    for count, grab in zip(counts, grabs):
-        chunks = numpy.append(chunks, numpy.arange(num, count + num, grab))
-        chunks = numpy.append(chunks, [count + num])
-        num += count
-    chunks = numpy.unique(chunks).astype(numpy.uint32)
-    sizes = chunks[1:] - chunks[0:-1]
-    return templates, sizes
+    """Group equal FFT grids with integer batch sizes and no empty chunks."""
+    if not templates or maxelements < 1:
+        raise ValueError('nonempty bank and positive maxelements required')
+    templates = sorted(templates, key=lambda t: (1 / t.delta_f, len(t)))
+    sizes = []
+    offset = 0
+    while offset < len(templates):
+        end = offset + 1
+        key = (templates[offset].delta_f, len(templates[offset]))
+        while end < len(templates) and (templates[end].delta_f, len(templates[end])) == key:
+            end += 1
+        batch = max(1, int(maxelements) // ((len(templates[offset]) - 1) * 2))
+        sizes.extend(min(batch, end - i) for i in range(offset, end, batch))
+        offset = end
+    return templates, numpy.asarray(sizes, dtype=numpy.uint32)
 
 
 def resolve_filter_backend(args, rank, size):
@@ -478,7 +453,10 @@ class JaxLiveBatchMatchedFilter(object):
                  max_triggers_in_batch=None,
                  jax_platform='cpu',
                  processing_device_id=0,
-                 device_id=None):
+                 device_id=None,
+                 autotune=False, tuning_candidates=(1, 2, 4, 8, 16, 32, 64),
+                 tuning_repeats=5, memory_budget_mb=None,
+                 max_batch_latency_ms=None):
         if device_id is not None:
             processing_device_id = device_id
         self.snr_threshold = snr_threshold
@@ -495,6 +473,19 @@ class JaxLiveBatchMatchedFilter(object):
         self.device, self.gpu_available = configure_jax(
             jax_platform, processing_device_id)
         self.startup_comparisons = []
+        self.autotune = autotune
+        self.tuning_candidates = tuple(sorted(set(int(x) for x in tuning_candidates)))
+        if not self.tuning_candidates or min(self.tuning_candidates) < 1 or tuning_repeats < 1:
+            raise ValueError('positive tuning candidates and repeats required')
+        if memory_budget_mb is not None and (not numpy.isfinite(memory_budget_mb) or memory_budget_mb <= 0):
+            raise ValueError('memory budget must be positive')
+        if max_batch_latency_ms is not None and (not numpy.isfinite(max_batch_latency_ms) or max_batch_latency_ms <= 0):
+            raise ValueError('latency limit must be positive')
+        self.tuning_repeats = tuning_repeats
+        self.memory_budget_mb = memory_budget_mb
+        self.max_batch_latency_ms = max_batch_latency_ms
+        self.tuning_report = None
+        self._tuning = False
 
         templates, self.chunks = _duration_chunks(templates, maxelements)
         self.tgroups = []
@@ -507,11 +498,16 @@ class JaxLiveBatchMatchedFilter(object):
             group = templates[offset:offset + count]
             offset += count
             self.tgroups.append(group)
-            series = self._prepare_group(group)
+            jax, _ = _import_jax()
+            with jax.default_device(self.device):
+                series = self._prepare_group(group)
             self._series.append(series)
             self._lengths.append((len(group[0]) - 1) * 2)
-            self._states.append(_DurationGroup(series, group, self.device))
+            if not autotune:
+                with jax.default_device(self.device):
+                    self._states.append(_DurationGroup(series, group, self.device))
 
+        self._bank_groups = list(zip(self.tgroups, self._series))
         self._log_startup_summary()
 
     def _prepare_group(self, group):
@@ -675,8 +671,13 @@ class JaxLiveBatchMatchedFilter(object):
         return result
 
     def process_data(self, data_reader):
-        self.set_data(data_reader)
-        return self.process_all()
+        jax, _ = _import_jax()
+        with jax.default_device(self.device):
+            if self.autotune and self.tuning_report is None and not self._tuning:
+                from .jax_tuning import tune_live_filter
+                tune_live_filter(self, data_reader)
+            self.set_data(data_reader)
+            return self.process_all()
 
     def process_all(self):
         results = []

@@ -350,3 +350,10 @@ and transfer costs. Start with correctness, then increase `--bank-sizes`
 and inspect actual `chunks`, setup time and warm time. This
 runner measures the production host-trigger workflow; it does not claim a
 GPU speedup based solely on an asynchronous FFT launch.
+
+
+For actual MPI `pycbc_live` IMRPhenomD comparisons, separate waveform/filter
+benchmarks, automatic per-node GPU assignment and measured batch tuning, see
+[IMRPHENOMD_BENCHMARK.md](../../live/IMRPHENOMD_BENCHMARK.md). GPU MPI assignment
+now uses `--jax-device-id auto` (or an index within scheduler visibility), not
+`--processing-device-id`. GPU requests never silently fall back to CPU.

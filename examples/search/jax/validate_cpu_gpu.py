@@ -493,6 +493,12 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
         surfaces[int(template.id)] = (np.asarray(template.out)[start:stop]*np.float32(norm)).copy()
     products['native_batch'] = dict(result=aligned_result(result, ids), rho=np.stack([surfaces[i] for i in ids]))
     timings['native_batch'] = dict(setup_s=setup, engine_reused=reused, **timing)
+    if getattr(args, 'benchmark_components', False):
+        from benchmark_components import benchmark_native_filter, benchmark_native_batch
+        timings['native_serial']['matched_filter_only'] = benchmark_native_filter(
+            serial, start, stop, args.repeats)
+        timings['native_batch']['matched_filter_only'] = benchmark_native_batch(
+            batch, reader, start, stop, args.repeats)
     native = products['native_serial']
     representative = injection['template_id'] if injection else ids[int(np.argmax(native['result']['snr']))]
     ri = ids.index(representative)
@@ -521,7 +527,7 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
             pc, sc = native_curves(serial, pack, template, np.array([index]))
         return pc[0], sc[0]
     for platform_name, device in devices.items():
-        for mode in ['serial', 'batch']:
+        for mode in ['serial', 'batch'] + (['tuned'] if getattr(args, 'autotune', False) else []):
             name = 'jax_' + platform_name + '_' + mode
             with jax.default_device(device):
                 began = time.perf_counter()
@@ -529,7 +535,9 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
                 if not reused:
                     workspace[name] = ValidationFilter(list(templates), snr_threshold=0,
                         chisq_bins='8', sg_chisq=sg(), jax_platform=platform_name,
-                        processing_device_id=device.id, maxelements=ntime if mode == 'serial' else 2**27)
+                        processing_device_id=device.id, maxelements=ntime if mode == 'serial' else 2**27,
+                        autotune=mode == 'tuned', tuning_repeats=args.tuning_repeats,
+                        memory_budget_mb=args.memory_budget_mb)
                 engine = workspace[name]
                 setup = 0 if reused else time.perf_counter()-began
                 if engine.device != device:
@@ -537,10 +545,15 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
                 result, timing = timed(lambda: engine.process_data(reader), args.repeats)
                 rho, chosen, links = engine_surface(engine, ids, start, stop, device)
                 engine_links[name] = links
+                if getattr(args, 'benchmark_components', False):
+                    from benchmark_components import benchmark_jax_filter
+                    timing['matched_filter_only'] = benchmark_jax_filter(
+                        engine, start, stop, args.repeats)
                 products[name] = dict(result=aligned_result(result, ids), rho=rho)
                 timings[name] = dict(setup_s=setup, engine_reused=reused, **timing)
                 metadata[name] = dict(device=str(device), device_kind=device.device_kind,
-                    chunks=[int(x) for x in engine.chunks], waveforms=engine.startup_comparisons)
+                    chunks=[int(x) for x in engine.chunks], waveforms=engine.startup_comparisons,
+                    tuning=engine.tuning_report)
                 pcurve, scurve = jax_curves(engine, links[representative], points, device)
                 curves[name] = dict(power=pcurve, sg=scurve)
                 # Independent CPU filtering of the exact chosen waveform
@@ -656,7 +669,11 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
     for name, timing in timings.items():
         timing['speedup_vs_native_serial'] = timings['native_serial']['median_s']/timing['median_s']
         timing['speedup_vs_native_batch'] = timings['native_batch']['median_s']/timing['median_s']
-        serial_name = name.replace('_batch', '_serial')
+        if 'matched_filter_only' in timing:
+            timing['matched_filter_only']['speedup_vs_native_batch'] = (
+                timings['native_batch']['matched_filter_only']['median_s'] /
+                timing['matched_filter_only']['median_s'])
+        serial_name = name.replace('_batch', '_serial').replace('_tuned', '_serial')
         timing['speedup_vs_same_backend_serial'] = timings[serial_name]['median_s']/timing['median_s']
     save_json(directory/'case.json', report)
     return report
@@ -679,6 +696,11 @@ def main():
         help='Requested optimal injection SNR (>=10); boosted when needed to keep recovery above 10 in noise')
     parser.add_argument('--injection-templates', choices=['all', 'first'], default='all',
         help='Separate eight-second injection for every bank template (default), or only the first for a quick check')
+    parser.add_argument('--autotune', action='store_true')
+    parser.add_argument('--tuning-repeats', type=int, default=5)
+    parser.add_argument('--memory-budget-mb', type=float)
+    parser.add_argument('--benchmark-components', action='store_true',
+        help='Time bank waveform generation and matched filtering separately from vetoes')
     parser.add_argument('--no-arrays', action='store_true')
     parser.add_argument('--output', type=Path, default=Path(__file__).parent/'validation_results')
     args = parser.parse_args()
@@ -738,6 +760,10 @@ def main():
                     directory.mkdir(parents=True, exist_ok=True)
                     bank, templates, readers, start, stop = build_fixture(args, model, rows[:count], directory)
                     workspace = {}
+                    if args.benchmark_components and model == 'IMRPhenomD':
+                        from benchmark_components import benchmark_waveforms
+                        save_json(directory/'waveform_timings.json', benchmark_waveforms(
+                            bank, templates, devices, args.repeats))
                     for dataset, reader in readers.items():
                         output = directory/dataset
                         output.mkdir(exist_ok=True)
@@ -775,6 +801,9 @@ def main():
                                       f"dSNR vs jax_cpu_serial=" + ('N/A (self)' if cross['self_comparison'] else
                                       f"{cross['max_complex_snr_error']:.9e}, exactly_equal={cross['surface_exactly_equal']}"), flush=True)
                         save_json(args.output/'summary.json', report)
+                    if args.benchmark_components and model == 'IMRPhenomD':
+                        from benchmark_components import plot_components
+                        plot_components(directory)
                     workspace.clear()
                     jax.clear_caches()  # Reuse compiled shapes across injections within each bank.
         report['gpu_tested'] = 'gpu' in devices
