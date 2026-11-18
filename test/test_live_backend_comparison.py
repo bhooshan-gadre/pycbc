@@ -56,6 +56,7 @@ def test_plan_reuses_bank_and_only_changes_backend(tmp_path):
         assert '--stage-profile-dir' in row['command']
         assert ('--jax-coordinator-preprocessing' in row['command']) == (row['mode'] == 'jax_gpu')
         assert ('--jax-allow-gpu-sharing' in row['command']) == (row['mode'] == 'jax_gpu')
+        assert ('--jax-autotune' in row['command']) == (row['mode'] == 'jax_gpu')
         if row['mode'] != 'native':
             assert runner.values(row['command'],'--jax-waveform-source') == ['bank']
             assert runner.values(row['command'],'--jax-preprocessing') == ['condition']
@@ -126,3 +127,45 @@ def test_explicit_native_bank_source_bypasses_waveform_regeneration():
     value,report=engine._generate_and_compare(Template())
     assert value is None and report['implementation']=='native-bank'
     assert not report['use_generated'] and report['match_template']==1.
+
+
+def test_random_candidate_directories_match_but_products_still_checked(tmp_path):
+    native,actual=tmp_path/'native',tmp_path/'actual'
+    folders=[]
+    for root,suffix in [(native,'kwvk'),(actual,'rvnv')]:
+        write_output(root)
+        folder=root/'2020_05_06'/f'candidate_1272790260.107_{suffix}'
+        folder.mkdir(parents=True);folders.append(folder)
+        with h5py.File(folder/'coinc-1272790260.107_H1_psd.hdf','w') as f:
+            f['psd']=np.ones(16)
+        (folder/'candidate.xml').write_text('''<LIGO_LW><Table Name="sngl_inspiral:table">
+<Column Name="sngl_inspiral:ifo"/><Column Name="sngl_inspiral:snr"/>
+<Stream Delimiter=",">H1,20,</Stream></Table></LIGO_LW>''')
+    assert comparison.compare(native,actual,2048,tmp_path,'suffix')['passed']
+    with h5py.File(folders[1]/'coinc-1272790260.107_H1_psd.hdf','r+') as f:
+        f['psd'][0]=2
+    result=comparison.compare(native,actual,2048,tmp_path,'changed')
+    assert not result['passed'] and result['other_products']['errors']
+    xml=comparison.candidates(actual)
+    key=next(iter(xml));xml[key]['sngl_inspiral:table'][0]['snr']=21
+    assert not comparison.compare_xml(comparison.candidates(native),xml,2048)['passed']
+    import shutil
+    shutil.copytree(folders[1],folders[1].with_name('candidate_1272790260.107_abcd'))
+    with pytest.raises(ValueError,match='Ambiguous candidate product'):
+        comparison.collect(actual)
+    with pytest.raises(ValueError,match='Ambiguous candidate XML'):
+        comparison.candidates(actual)
+
+
+def test_structured_statistics_use_field_tolerances_and_exact_counts():
+    dtype=[('snr','f4'),('coa_phase','f4'),('end_time','f8'),('template_id','u8')]
+    a=np.array([(10.,.5,1272790260.,2**63)],dtype=dtype)
+    b=a.copy();b['snr']+=1e-5;b['coa_phase']+=1e-5
+    assert comparison.difference(a,b,'stat',2048)['passed']
+    b['template_id']+=1
+    assert not comparison.difference(a,b,'stat',2048)['passed']
+    b=a.copy();b['snr']+=1
+    assert not comparison.difference(a,b,'stat',2048)['passed']
+    result=comparison.difference(100,101,'count',2048)
+    assert not result['passed']
+    assert result['native_values']==[100] and result['actual_values']==[101]

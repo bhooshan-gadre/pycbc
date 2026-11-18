@@ -73,6 +73,31 @@ def test_jax_disabled_veto(bank_and_reader):
     np.testing.assert_array_equal(actual['sg_chisq'], 0)
 
 
+@pytest.mark.parametrize('threshold',[4,100])
+def test_deferred_bank_download_matches_serial_batches(bank_and_reader, monkeypatch, threshold):
+    import jax
+    bank, reader = bank_and_reader
+    _, engine = engines(bank, snr_threshold=threshold)
+    from pycbc.filter.jax_tuning import install_layout
+    install_layout(engine, 1)
+    expected = engine.process_data(reader)
+    engine.set_data(reader)
+    calls = []
+    original = jax.device_get
+    def observe(value):
+        calls.append(value)
+        return original(value)
+    monkeypatch.setattr(jax, 'device_get', observe)
+    batches = list(engine._collect_device_batches())
+    assert len(engine.tgroups) == 4
+    assert len(calls) == 1 and len(calls[0]) == 4
+    results = engine.combine_results([r for r,_ in batches])
+    links = [link for _,batch_links in batches for link in batch_links]
+    actual = engine._process_vetoes(results, links)
+    for key in expected:
+        np.testing.assert_array_equal(actual[key],expected[key])
+
+
 def test_cpu_surface_is_lazy_and_window_refreshes(bank_and_reader):
     bank, reader = bank_and_reader
     _cpu, engine = engines(bank)

@@ -91,7 +91,10 @@ def main():
     p.add_argument('--allow-gpu-sharing', action='store_true', help='Explicitly permit coordinator/worker GPU sharing')
     p.add_argument('--profile-stages', action='store_true', help='Record per-rank stage timings with GPU synchronization')
     p.add_argument('--jax-preprocessing', choices=['off','whiten','condition'], default='off')
-    p.add_argument('--autotune', action='store_true', help='Enable JAX tuning; startup cost stays in wall time')
+    p.add_argument('--autotune', action=argparse.BooleanOptionalAction, default=None,
+                   help='Tune GPU batches by default; --autotune also tunes CPU, --no-autotune disables tuning')
+    p.add_argument('--tuning-candidates', nargs='+', type=int, default=[1,2,4,8,16,32,64,128,256])
+    p.add_argument('--tuning-repeats', type=int, default=5)
     p.add_argument('--memory-budget-mb', type=float)
     p.add_argument('--args-json', type=Path, help='Advanced: fixed native search argv JSON, instead of shared example options')
     p.add_argument('--plan-only', action='store_true', help='Validate fixtures and save exact commands without launching MPI')
@@ -100,6 +103,8 @@ def main():
         p.error('positive repeats, >=2 MPI ranks and unique modes including native required')
     if args.coordinator_gpu and args.jax_preprocessing != 'condition':
         p.error('--coordinator-gpu requires --jax-preprocessing condition')
+    if min(args.tuning_candidates) < 1 or args.tuning_repeats < 1:
+        p.error('Tuning candidates and repeats must be positive')
     out = args.output.resolve(); directory = args.example_dir.resolve()
     if out.exists() and any(out.iterdir()):
         p.error('Use a new or empty output directory')
@@ -159,8 +164,10 @@ def main():
                         argv += ['--jax-coordinator-preprocessing']
                     if mode == 'jax_gpu' and args.allow_gpu_sharing:
                         argv += ['--jax-allow-gpu-sharing']
-                    if args.autotune:
-                        argv += ['--jax-autotune']
+                    if args.autotune is True or (args.autotune is None and mode == 'jax_gpu'):
+                        argv += ['--jax-autotune','--jax-tuning-candidates',
+                                 *map(str,args.tuning_candidates),
+                                 '--jax-tuning-repeats',str(args.tuning_repeats)]
                     if args.memory_budget_mb is not None:
                         argv += ['--jax-memory-budget-mb',str(args.memory_budget_mb)]
                 command = [args.launcher,*args.launcher_arg,'-n',str(args.mpi_ranks),

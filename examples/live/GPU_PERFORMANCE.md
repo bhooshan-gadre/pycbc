@@ -63,7 +63,7 @@ python examples/live/run_backend_comparison.py \
   --launcher mpirun \
   --example-dir /path/to/native/fixtures \
   --output /scratch/bug/live-profile-original \
-  --modes native jax_gpu --repeats 1 --profile-stages
+  --modes native jax_gpu --repeats 1 --profile-stages --no-autotune
 
 python examples/live/analyze_backend_performance.py \
   --run-dir /scratch/bug/live-profile-original
@@ -99,7 +99,7 @@ python examples/live/run_backend_comparison.py \
   --example-dir /path/to/native/fixtures \
   --output /scratch/bug/live-profile-conditioned \
   --modes native jax_gpu --repeats 1 \
-  --jax-preprocessing condition --profile-stages
+  --jax-preprocessing condition --profile-stages --no-autotune
 
 python examples/live/analyze_backend_performance.py \
   --run-dir /scratch/bug/live-profile-conditioned
@@ -108,9 +108,61 @@ python examples/live/analyze_backend_performance.py \
 Use a fresh output directory each time. To isolate only the whitening/transfer
 change first, use `--jax-preprocessing whiten`. To compare final runtime, rerun
 without profiling and use three repeats. Keep batch tuning identical in your
-control and treatment runs; optional `--autotune` includes its cost in total
+control and treatment runs; `--autotune` includes its cost in total
 wall time. Changing bank size/batch size and preprocessing simultaneously will
 make attribution difficult.
+
+### Tune batches and remove batch-by-batch host waits
+
+The comparison runner now enables autotuning for GPU modes by default. CPU
+tuning requires `--autotune`; `--no-autotune` disables both. Filtering was
+already batched without tuning, using the native maximum-elements limit.
+The tuner measures synchronized full-bank filtering plus vetoes for candidate
+sizes 1 through 256 (powers of two), plus the original largest batch where
+memory permits. It chooses the lowest worst-workload median under the supplied
+memory/latency constraints. This is a measured choice among candidates, not a
+guarantee of a global optimum. Use `--tuning-candidates` and `--tuning-repeats`
+to control the sweep.
+
+GPU filtering now enqueues all duration batches before collecting their peak
+vectors with one host request. It previously waited for each batch's peaks
+before dispatching the next. Profiling still synchronizes individual stages
+for attribution; omit profiling to measure the dispatch improvement.
+
+```bash
+python examples/live/run_backend_comparison.py \
+  --launcher mpirun --example-dir /path/to/native/fixtures \
+  --output /scratch/bug/live-tuned --modes native jax_gpu --repeats 2 \
+  --jax-preprocessing condition --autotune --profile-stages
+python examples/live/analyze_backend_performance.py \
+  --run-dir /scratch/bug/live-tuned
+```
+
+The analyzer now prints per-rank stage costs, actual batch-size histograms,
+tuning startup time, and detailed parity failures. With profiling enabled,
+`stages/rankN-tuning.json` preserves every measured candidate. Tuning is paid
+again in each new MPI process; compare warm block latencies separately from
+complete wall time. A short replay can spend more time tuning than it saves.
+The tuning sweep disables per-stage profiling barriers while retaining a
+host-ready full-bank result for every measurement, so it selects a production
+layout even when the subsequent replay is profiled.
+
+### Recheck existing output without repeating the search
+
+```bash
+python examples/live/compare_backend_runs.py --run-dir /scratch/bug/live-tuned
+python examples/live/analyze_backend_performance.py --run-dir /scratch/bug/live-tuned
+```
+
+The comparator matches candidate directories by timestamp and ignores the
+four random lowercase characters appended by `get_candidate_path`. It still
+compares every product, and rejects ambiguous duplicate candidate identities.
+Structured numeric `stat` records are checked field by field using the existing
+numeric tolerances, with integer identifiers/counts checked exactly. These
+fix comparator false failures; differing `background/count` values remain a
+failure and now show the actual native/JAX counts. Do not infer search parity
+from disappearance of the random-path errors alone. Repeating native runs in
+the same comparison also checks native reproducibility against the first run.
 
 ### Rank 0 can remain the bottleneck
 

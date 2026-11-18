@@ -63,7 +63,9 @@ def install_layout(engine, batch):
 def tune_live_filter(engine, reader):
     started = time.perf_counter()
     maximum = max(len(g) for g, _ in engine._bank_groups)
-    candidates = sorted({min(c, maximum) for c in engine.tuning_candidates})
+    # Include the untuned layout's largest batch, so tuning also measures the
+    # previous configuration rather than comparing only small alternatives.
+    candidates = sorted({min(c, maximum) for c in engine.tuning_candidates} | {maximum})
     stats = engine.device.memory_stats() or {}
     if engine.memory_budget_mb is not None:
         budget = engine.memory_budget_mb * 2**20
@@ -78,6 +80,11 @@ def tune_live_filter(engine, reader):
     saved = {k: getattr(engine, k) for k in ('snr_threshold', 'snr_abort_threshold',
              'newsnr_threshold', 'max_triggers_in_batch')}
     sg_threshold = getattr(engine.sg_chisq, 'snr_threshold', 4)
+    profiling = getattr(engine, 'profile_stages', False)
+    # Select the production layout, not one optimized for artificial
+    # per-stage profiling barriers. Host-ready results still synchronize each
+    # complete bank evaluation used by the objective.
+    engine.profile_stages = False
     engine._tuning = True
     try:
         for batch in candidates:
@@ -115,6 +122,7 @@ def tune_live_filter(engine, reader):
         install_layout(engine, selected)
         engine.tuning_report = dict(batch_size=selected, candidates=measurements,
             memory_budget_bytes=budget, setup_s=time.perf_counter()-started,
+            stage_profiling=False,
             objective='minimize worst median full-bank filtering+veto latency',
             latency_limit_scope='full bank, including forced all-template veto workload')
         import logging
@@ -123,4 +131,5 @@ def tune_live_filter(engine, reader):
         for key, value in saved.items():
             setattr(engine, key, value)
         engine.sg_chisq.snr_threshold = sg_threshold
+        engine.profile_stages = profiling
         engine._tuning = False

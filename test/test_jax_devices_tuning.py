@@ -106,9 +106,10 @@ def test_tuning_budget_failure_restores_thresholds():
         memory_budget_mb=1e-9, max_batch_latency_ms=None,
         snr_threshold=5, snr_abort_threshold=500, newsnr_threshold=4,
         max_triggers_in_batch=30, sg_chisq=SimpleNamespace(do=False,snr_threshold=4),
-        _tuning=False)
+        _tuning=False, profile_stages=True)
     with pytest.raises(RuntimeError, match='No batch candidate'):
         tune_live_filter(engine,None)
     assert not engine._tuning
     assert engine.snr_threshold == 5 and engine.max_triggers_in_batch == 30
     assert engine.sg_chisq.snr_threshold == 4
+    assert engine.profile_stages is True

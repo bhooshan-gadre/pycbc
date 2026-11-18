@@ -1411,6 +1411,17 @@ with ctx:
                         det_profile['filter_s'] = time.perf_counter()-stage_began
                         if args.stage_profile_dir and filter_backend == 'jax':
                             det_profile['jax'] = mf.last_profile.copy()
+                            sizes, counts = numpy.unique(mf.chunks, return_counts=True)
+                            det_profile['batching'] = dict(batches=len(mf.chunks),
+                                templates=int(sum(mf.chunks)),
+                                sizes={str(int(s)):int(c) for s,c in zip(sizes,counts)},
+                                autotune=bool(mf.autotune),
+                                selected=mf.tuning_report['batch_size'] if mf.tuning_report else None)
+                            if mf.tuning_report is not None:
+                                tuning_path = os.path.join(args.stage_profile_dir, 'rank%s-tuning.json' % evnt.rank)
+                                if not os.path.exists(tuning_path):
+                                    with open(tuning_path, 'x') as tuning_handle:
+                                        json.dump(mf.tuning_report, tuning_handle, indent=2)
                             conditioner = getattr(data_reader[ifo], 'jax_conditioner', None)
                             if conditioner: det_profile['device_buffer'] = conditioner.metrics.copy()
             else:

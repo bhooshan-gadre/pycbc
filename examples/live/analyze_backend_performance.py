@@ -41,8 +41,16 @@ def analyze(manifest, warmup=1):
                     max_s=max(values))
             coarse={name:rank['stages'][name]['median_s'] for name in ['conditioning_all_detectors_s','filtering_all_detectors_s','mpi_s','postprocess_s'] if name in rank['stages'] and rank['stages'][name]['median_s'] is not None}
             rank['dominant_serial_stage']=max(coarse,key=coarse.get) if coarse else None
-            last=blocks[-1] if blocks else {}
-            rank['buffer_transfers']={ifo:d['device_buffer'] for ifo,d in last.get('detectors',{}).items() if 'device_buffer' in d}
+            # The last replay block may be inactive: retain the last recorded
+            # layout/counters for each detector, not just the final block.
+            rank['buffer_transfers']={}
+            rank['batching']={}
+            for entry in blocks:
+                for ifo,d in entry.get('detectors',{}).items():
+                    if 'device_buffer' in d:rank['buffer_transfers'][ifo]=d['device_buffer']
+                    if 'batching' in d:rank['batching'][ifo]=d['batching']
+            tuning_path=path.with_name(path.stem+'-tuning.json')
+            if tuning_path.exists():rank['tuning']=json.loads(tuning_path.read_text())
             row['ranks'][path.stem]=rank
         root=row['ranks'].get('rank0')
         if root and 'block_s' in root['stages'] and run['wall_s'] is not None:
@@ -89,6 +97,30 @@ def main():
         print(run['mode'],run['repeat'],'wall_s=',run['wall_s'],
               'outside_loop_s=',run.get('outside_rank0_loop_s'),
               'profiles=',run['profile_available'])
+        for name,rank in run['ranks'].items():
+            print(' ',name,'dominant stage:',rank['dominant_serial_stage'])
+            for stage,values in rank['stages'].items():
+                if stage in ['conditioning_all_detectors_s','filtering_all_detectors_s','mpi_s','postprocess_s'] or '/jax/' in stage:
+                    print(f"    {stage}: total={values['total_s']:.6f}s median={values['median_s']}s p95={values['p95_s']}s")
+            for ifo,batching in rank['batching'].items():
+                print('   ',ifo,'batching:',json.dumps(batching,sort_keys=True))
+            if 'tuning' in rank:
+                print('    tuning setup_s=',rank['tuning']['setup_s'])
+    parity_path=args.run_dir/'comparison'/'summary.json'
+    if parity_path.exists():
+        parity=json.loads(parity_path.read_text())
+        print('Output parity:',parity.get('status'))
+        for label,result in parity.get('comparisons',{}).items():
+            if result.get('passed'):continue
+            print(' ',label,'FAILED')
+            for key in ['missing_files','extra_files','missing_triggers','extra_triggers','row_errors']:
+                if result.get(key):print('   ',key,':',json.dumps(result[key][:5]))
+            for field,value in result.get('fields',{}).items():
+                if not value['passed']:print('   ',field,':',json.dumps(value))
+            for key,value in result.get('other_products',{}).items():
+                if value:print('    other_products/',key,':',json.dumps(value[:5]))
+            candidates=result.get('candidates',{})
+            if candidates and not candidates.get('passed'):print('    candidates:',json.dumps(candidates))
     if not rows:
         print('No stage profiles: rerun with --profile-stages.')
         return 1

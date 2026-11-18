@@ -22,10 +22,25 @@ def dump(path, value):
     path.write_text(json.dumps(value,indent=2,allow_nan=False)+'\n')
 
 
+def product_identity(path, directory):
+    """Match candidate products by GPS path, ignoring only its random suffix.
+
+    get_candidate_path appends random_string(4), independently of backend.
+    Keep the timestamp, detector, product name and all other path components.
+    Ambiguous normalized paths are rejected by the collectors.
+    """
+    return '/'.join(re.sub(r'^(candidate_\d+\.\d{3})_[a-z]{4}$',r'\1',part)
+                    for part in path.relative_to(directory).parts)
+
+
 def collect(directory):
-    rows, extras, files = {}, {}, []
+    rows, extras, files, seen = {}, {}, [], set()
     for path in sorted(directory.rglob('*.hdf')):
-        relative = str(path.relative_to(directory)); files.append(relative)
+        relative = product_identity(path,directory)
+        if relative in seen:
+            raise ValueError('Ambiguous candidate product identity: '+relative)
+        seen.add(relative)
+        files.append(relative)
         with h5py.File(path,'r') as f:
             for ifo in IFOS & set(f):
                 group = f[ifo]
@@ -54,12 +69,24 @@ def difference(a,b,field,rate):
     a,b = np.asarray(a),np.asarray(b)
     if a.shape != b.shape:
         return dict(passed=False,reason=f'shape {a.shape} versus {b.shape}')
+    if a.dtype.names or b.dtype.names:
+        if a.dtype.names != b.dtype.names:
+            return dict(passed=False,reason='structured field names differ')
+        fields={name:difference(a[name],b[name],name,rate) for name in a.dtype.names}
+        return dict(passed=all(v['passed'] for v in fields.values()),fields=fields,
+                    reason=None if all(v['passed'] for v in fields.values()) else 'structured fields differ')
     if a.dtype.kind not in 'iufc' or b.dtype.kind not in 'iufc':
         equal = np.array_equal(a,b)
         return dict(passed=bool(equal),reason=None if equal else 'non-numeric values differ')
     if a.dtype.kind in 'iu' and b.dtype.kind in 'iu':
         equal = np.array_equal(a,b)
-        return dict(passed=bool(equal),reason=None if equal else 'integer values differ')
+        result=dict(passed=bool(equal),reason=None if equal else 'integer values differ')
+        if not equal:
+            mismatch=np.flatnonzero(a.reshape(-1)!=b.reshape(-1))
+            result.update(mismatched_values=int(len(mismatch)),
+                native_values=a.reshape(-1)[mismatch[:8]].tolist(),
+                actual_values=b.reshape(-1)[mismatch[:8]].tolist())
+        return result
     delta = b.astype(np.complex128 if a.dtype.kind == 'c' else np.float64)-a
     if field == 'coa_phase':
         delta = np.angle(np.exp(1j*delta))
@@ -98,7 +125,10 @@ def candidates(directory):
                     rows.append(row)
             rows.sort(key=lambda r:tuple(str(r.get(k,'')) for k in ['ifo','mass1','mass2','spin1z','spin2z','end_time','end_time_ns']))
             tables[name] = rows
-        result[str(path.relative_to(directory))] = tables
+        relative = product_identity(path,directory)
+        if relative in result:
+            raise ValueError('Ambiguous candidate XML identity: '+relative)
+        result[relative] = tables
     return result
 
 

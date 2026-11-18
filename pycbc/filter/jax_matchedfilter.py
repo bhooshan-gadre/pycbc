@@ -698,18 +698,19 @@ class JaxLiveBatchMatchedFilter(object):
             if self.profile_stages:
                 self.last_profile['filter_total_s'] = _time.perf_counter()-began
                 self.last_profile['host_selection_s'] = max(0.,self.last_profile['filter_total_s']-sum(
-                    self.last_profile.get(k,0.) for k in ['whitening_transfer_s','psd_weights_s','surface_s','vetoes_s']))
+                    self.last_profile.get(k,0.) for k in ['whitening_transfer_s','psd_weights_s','surface_s','peak_transfer_s','vetoes_s']))
             return result
 
     def process_all(self):
         results = []
         links = []
-        while 1:
-            result, batch_links = self._process_batch()
+        if self.device.platform == 'gpu':
+            batches = self._collect_device_batches()
+        else:
+            batches = iter(self._process_batch, (None, None))
+        for result, batch_links in batches:
             if result is False:
                 return False
-            if result is None:
-                break
             results.append(result)
             links.extend(batch_links)
 
@@ -724,6 +725,24 @@ class JaxLiveBatchMatchedFilter(object):
         if self.profile_stages:
             self.last_profile['vetoes_s'] = _time.perf_counter()-began
         return result
+
+    def _collect_device_batches(self):
+        """Enqueue the bank before downloading its small peak vectors.
+
+        Each duration group owns its surface buffers. No subsequent group
+        overwrites a pending peak or correlation used by the vetoes.
+        """
+        pending = []
+        while self.block_id < len(self.tgroups):
+            pending.append(self._process_batch(defer_download=True))
+        jax, _ = _import_jax()
+        began = _time.perf_counter()
+        peaks = jax.device_get([(s.peak, s.index, s.abs_snr)
+                                for _, s, _ in pending])
+        if self.profile_stages:
+            self.last_profile['peak_transfer_s'] = _time.perf_counter()-began
+        for (group, state, valid_start), host in zip(pending, peaks):
+            yield self._select_batch(group, state, valid_start, host)
 
     def _evaluate_surface(self, state, valid_start, valid_len):
         """Normalized ρ(t, φ, θ) and on-device peaks for one duration group."""
@@ -754,7 +773,7 @@ class JaxLiveBatchMatchedFilter(object):
         state.abs_snr = abs_snr
         return abs_snr
 
-    def _process_batch(self):
+    def _process_batch(self, defer_download=False):
         if self.block_id == len(self.tgroups):
             return None, None
 
@@ -792,11 +811,19 @@ class JaxLiveBatchMatchedFilter(object):
             self.last_profile['surface_s'] = self.last_profile.get('surface_s', 0)+_time.perf_counter()-began
         self.block_id += 1
 
+        if defer_download:
+            return group, state, valid_start
+
         jax, _jnp = _import_jax()
         # A group has few peaks but a large surface. Transfer just the peak
         # vectors together; avoid separate device gathers and synchronizations.
         host_peak, host_index, host_abs = jax.device_get(
             (state.peak, state.index, abs_snr))
+        return self._select_batch(group, state, valid_start,
+                                  (host_peak, host_index, host_abs))
+
+    def _select_batch(self, group, state, valid_start, host):
+        host_peak, host_index, host_abs = host
         state.host_abs_snr = host_abs
         above = host_abs >= numpy.float32(self.snr_threshold)
         rows = numpy.flatnonzero(above)
