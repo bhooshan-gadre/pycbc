@@ -61,11 +61,8 @@ therefore requires two allocated GPUs for the GPU mode. Respect your scheduler's
 is assigned a distinct visible GPU automatically. GPU failures stay failures.
 For a CPU-only check explicitly pass `--modes native jax_cpu`.
 
-For MPICH/Hydra use `--launcher mpiexec` (or `--launcher mpiexec.mpich` when
-both MPI implementations are installed). The default comparison command uses
-only the common `-n` launcher option. For **Open MPI only**, binding can be
-disabled with `--launcher-arg=--bind-to --launcher-arg=none`; do not pass these
-options or Open MPI's `-x` options to Hydra. The runner uses the active
+For another launcher use `--launcher mpiexec`. Launcher arguments can be repeated,
+e.g. `--launcher-arg=--bind-to --launcher-arg=none`. The runner uses the active
 Python and this checkout's `bin/pycbc_live`; exported environment variables are
 inherited by local MPI workers. Multi-node jobs require the same checkout,
 environment and fixture paths on each node and scheduler-appropriate launch
@@ -159,26 +156,3 @@ native example's one coordinator plus one filtering worker. Use `--mpi-ranks 3`
 for two filtering workers/two GPUs, with the same layout for every backend;
 that changes the native example's original MPI partition. Multi-node jobs need
 shared fixture/output paths and identical environments on the participating nodes.
-
-
-### Native run.sh with MPICH/Hydra
-
-An error such as `HYDU_parse_array: unrecognized argument x` means that Hydra
-was given Open MPI's `-x` option. The updated `run.sh` uses `mpiexec -n 2`,
-inherits exported environment variables, and adds `--bind-to none` only when
-the launcher identifies itself as Open MPI/OpenRTE. It no longer forces local
-hosts. If needed, choose the launcher explicitly:
-
-```bash
-cd examples/live
-PYCBC_MPIEXEC=mpiexec bash run.sh
-# On machines with both MPI installations:
-PYCBC_MPIEXEC=mpiexec.mpich bash run.sh
-```
-
-Use the launcher belonging to the MPI library loaded by your environment's
-`mpi4py`. A two-rank check should print ranks 0 and 1, each with size 2:
-
-```bash
-mpiexec -n 2 python -c 'from mpi4py import MPI; print(MPI.COMM_WORLD.rank, MPI.COMM_WORLD.size, MPI.get_vendor())'
-```

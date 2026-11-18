@@ -144,17 +144,13 @@ rm -rf ./output
 echo -e "\\n\\n>> [`date`] Running PyCBC Live"
 
 
-# Both Open MPI and MPICH/Hydra accept -n. Exported variables are inherited;
-# -x and --bind-to are Open MPI-specific and must not be sent to Hydra.
-MPIEXEC="${PYCBC_MPIEXEC:-mpiexec}"
-mpi_args=(-n "${PYCBC_MPI_RANKS:-2}")
-mpi_version="$("$MPIEXEC" --version 2>&1 || true)"
-case "$mpi_version" in
-    *"Open MPI"*|*OpenRTE*) mpi_args+=(--bind-to none) ;;
-esac
-
-"$MPIEXEC" "${mpi_args[@]}" \
-python -m mpi4py "$(command -v pycbc_live)" \
+mpirun \
+-host localhost,localhost \
+-n 2 \
+--bind-to none \
+ -x PYTHONPATH -x LD_LIBRARY_PATH -x OMP_NUM_THREADS -x VIRTUAL_ENV -x PATH -x HDF5_USE_FILE_LOCKING \
+\
+python -m mpi4py `which pycbc_live` \
 "${live_example_args[@]}"
 
 # If you would like to use the pso optimizer, change --optimizer to pso
