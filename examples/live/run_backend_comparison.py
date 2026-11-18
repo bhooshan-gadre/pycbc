@@ -91,6 +91,11 @@ def main():
     p.add_argument('--allow-gpu-sharing', action='store_true', help='Explicitly permit coordinator/worker GPU sharing')
     p.add_argument('--profile-stages', action='store_true', help='Record per-rank stage timings with GPU synchronization')
     p.add_argument('--jax-preprocessing', choices=['off','whiten','condition'], default='off')
+    p.add_argument('--waveform-model', choices=['native','IMRPhenomD'], default='native',
+                   help='IMRPhenomD uses the same bank parameters/data with LAL native and compiled ripple JAX waveforms')
+    p.add_argument('--jax-waveform-source',choices=['bank','ripple'],default=None)
+    p.add_argument('--reference-waveforms',choices=['lal','ripple'],default='lal',
+                   help='ripple uses identical-model CPU reference banks for FFTW/JAX; lal retains the cross-model comparison')
     p.add_argument('--autotune', action=argparse.BooleanOptionalAction, default=None,
                    help='Tune GPU batches by default; --autotune also tunes CPU, --no-autotune disables tuning')
     p.add_argument('--tuning-candidates', nargs='+', type=int, default=[1,2,4,8,16,32,64,128,256])
@@ -129,6 +134,15 @@ def main():
     # by the original example. Exclude optimizer uniformly from this comparison.
     for flag in ['--run-snr-optimization','--snr-opt-extra-opts']:
         base = replace(base, flag)
+    if args.waveform_model == 'IMRPhenomD':
+        if '--approximant' not in base:p.error('Native options need --approximant')
+        start=base.index('--approximant')+1
+        base[start:start+len(values(base,'--approximant'))]=['IMRPhenomD']
+    waveform_source=args.jax_waveform_source or ('ripple' if args.waveform_model == 'IMRPhenomD' or args.reference_waveforms == 'ripple' else 'bank')
+    if waveform_source == 'ripple' and values(base,'--approximant') != ['IMRPhenomD']:
+        p.error('ripple requires --waveform-model IMRPhenomD or IMRPhenomD in --args-json')
+    if args.reference_waveforms == 'ripple' and values(base,'--approximant') != ['IMRPhenomD']:
+        p.error('ripple reference banks require IMRPhenomD')
     try:
         paths = input_files(base, directory)
         before = fingerprints(paths)
@@ -136,7 +150,7 @@ def main():
         p.error(str(exc)+'; use --prepare or point --example-dir at your native fixtures')
     out.mkdir(parents=True, exist_ok=True)
     versions = {}
-    for package in ['pycbc','numpy','jax','jaxlib','mpi4py']:
+    for package in ['pycbc','numpy','jax','jaxlib','mpi4py','ripplegw']:
         try: versions[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError: versions[package] = None
     manifest = dict(versions=versions,python=platform.python_version(),host=platform.node(),
@@ -144,6 +158,8 @@ def main():
         native_options_source=str(args.args_json.resolve() if args.args_json else HERE/'live_example_options.sh'),
         inputs=before, input_integrity=None, runs=[], plan_only=args.plan_only,
         threads=env['OMP_NUM_THREADS'],pythonhashseed=env['PYTHONHASHSEED'],
+        waveform_model=args.waveform_model,jax_waveform_source=waveform_source,
+        reference_waveforms=args.reference_waveforms,
         scope='pycbc_live through background/coincidence/trigger output; async SNR optimization and Bayestar excluded')
     failed = False
     try:
@@ -154,11 +170,12 @@ def main():
                 run = out/f'{mode}_{rep}'; run.mkdir()
                 argv = replace(base, '--output-path', run/'output')
                 argv += ['--latency-log', str(run/'latency.jsonl'),
+                         '--bank-waveform-source',args.reference_waveforms,
                          '--filter-backend','cpu' if mode == 'native' else 'jax']
                 if args.profile_stages:
                     argv += ['--stage-profile-dir',str(run/'stages')]
                 if mode != 'native':
-                    argv += ['--jax-platform', mode[4:], '--jax-waveform-source','bank',
+                    argv += ['--jax-platform', mode[4:], '--jax-waveform-source',waveform_source,
                              '--jax-preprocessing',args.jax_preprocessing]
                     if mode == 'jax_gpu' and args.coordinator_gpu:
                         argv += ['--jax-coordinator-preprocessing']

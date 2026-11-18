@@ -19,6 +19,7 @@ This modules contains functions reading, generating, and segmenting strain data
 import copy
 import logging
 import functools
+from time import perf_counter
 import numpy
 
 from scipy.signal import kaiserord
@@ -1943,7 +1944,12 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         status: boolean
             Returns True if this block is analyzable.
         """
+        profiling = getattr(self, 'profile_stages', False)
+        self.last_preprocessing_profile = {}
+        began = perf_counter()
         ts = super(StrainBuffer, self).attempt_advance(blocksize, timeout=timeout)
+        if profiling:self.last_preprocessing_profile['frame_io_s'] = perf_counter()-began
+        began = perf_counter()
         self.blocksize = blocksize
 
         self.gate_params = []
@@ -1982,6 +1988,7 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         if self.idq:
             self.idq.advance(blocksize)
 
+        if profiling:self.last_preprocessing_profile['state_dq_s'] = perf_counter()-began
         self.segments = {}
 
         # only condition with the needed raw data so we can continuously add
@@ -1994,6 +2001,7 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         strain = self.raw_buffer[start:]
 
         conditioner = getattr(self, 'jax_conditioner', None)
+        began = perf_counter()
         if conditioner and conditioner.mode == 'condition':
             strain = conditioner.condition_raw(strain)
         else:
@@ -2002,6 +2010,8 @@ class StrainBuffer(pycbc.frame.DataBuffer):
             strain = (strain * self.dyn_range_fac).astype(numpy.float32)
             strain = pycbc.filter.resample_to_delta_t(
                 strain, 1.0/self.sample_rate, method='ldas')
+        if profiling:self.last_preprocessing_profile['fir_resample_s'] = perf_counter()-began
+        began = perf_counter()
 
         # remove corruption at beginning
         strain = strain[self.corruption:]
@@ -2017,6 +2027,8 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         self.strain.roll(-sample_step)
         self.strain[len(self.strain) - csize + self.corruption:] = strain[:]
         self.strain.start_time += blocksize
+        if profiling:self.last_preprocessing_profile['stitch_s'] = perf_counter()-began
+        began = perf_counter()
 
         # apply gating if needed
         if self.autogating_threshold is not None:
@@ -2039,8 +2051,11 @@ class StrainBuffer(pycbc.frame.DataBuffer):
                          for gt in glitch_times]
                 self.strain = gate_data(self.strain, self.gate_params)
 
+        if profiling:self.last_preprocessing_profile['autogating_s'] = perf_counter()-began
+        began = perf_counter()
         if self.psd is None and self.wait_duration <=0:
             self.recalculate_psd()
+        if profiling:self.last_preprocessing_profile['initial_psd_s'] = perf_counter()-began
 
         return self.wait_duration <= 0
 

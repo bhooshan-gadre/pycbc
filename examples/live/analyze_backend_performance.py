@@ -32,6 +32,7 @@ def analyze(manifest, warmup=1):
                     for key in ['advance_s','psd_check_s','filter_s']:
                         if key in detector:append(ifo+'/'+key,detector[key])
                     for key,value in detector.get('jax',{}).items():append(ifo+'/jax/'+key,value)
+                    for key,value in detector.get('preprocessing',{}).items():append(ifo+'/preprocessing/'+key,value)
             rank=dict(startup=startup,blocks=len(blocks),stages={})
             for name,values in metrics.items():
                 tail=values[warmup:]
@@ -99,8 +100,16 @@ def main():
               'profiles=',run['profile_available'])
         for name,rank in run['ranks'].items():
             print(' ',name,'dominant stage:',rank['dominant_serial_stage'])
+            if rank['startup'].get('native_bank_generation_s') is not None:
+                print('    native bank generation_s=',rank['startup']['native_bank_generation_s'])
+            if rank['startup'].get('jax_waveforms'):
+                print('    JAX waveform generation:',json.dumps(rank['startup']['jax_waveforms']))
+            if rank['startup'].get('reference_waveforms'):
+                reference=rank['startup']['reference_waveforms']
+                print('    CPU reference waveform source:',rank['startup'].get('bank_waveform_source'))
+                print('    CPU reference generation/JIT:',json.dumps({k:v for k,v in reference.items() if k != 'waveforms'}))
             for stage,values in rank['stages'].items():
-                if stage in ['conditioning_all_detectors_s','filtering_all_detectors_s','mpi_s','postprocess_s'] or '/jax/' in stage:
+                if stage in ['conditioning_all_detectors_s','filtering_all_detectors_s','mpi_s','postprocess_s'] or '/jax/' in stage or '/preprocessing/' in stage:
                     print(f"    {stage}: total={values['total_s']:.6f}s median={values['median_s']}s p95={values['p95_s']}s")
             for ifo,batching in rank['batching'].items():
                 print('   ',ifo,'batching:',json.dumps(batching,sort_keys=True))

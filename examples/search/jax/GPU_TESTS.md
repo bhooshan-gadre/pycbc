@@ -357,3 +357,11 @@ benchmarks, automatic per-node GPU assignment and measured batch tuning, see
 [IMRPHENOMD_BENCHMARK.md](../../live/IMRPHENOMD_BENCHMARK.md). GPU MPI assignment
 now uses `--jax-device-id auto` (or an index within scheduler visibility), not
 `--processing-device-id`. GPU requests never silently fall back to CPU.
+
+# Compiled ripple live-search update
+
+The live comparison can now explicitly select compiled batched ripple waveforms
+with `--waveform-model IMRPhenomD`. GPU vetoes require CuPy/NVRTC for the
+native-compatible CUDA bin loops. See
+[COMPILED_RIPPLE_GPU.md](../../live/COMPILED_RIPPLE_GPU.md) for installation,
+required-GPU numerical tests, component timing plots and live replay commands.

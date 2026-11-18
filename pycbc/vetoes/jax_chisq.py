@@ -6,7 +6,9 @@ sum ``v[j] * exp(2 * pi * i * shift * j / slen)`` with ``slen = len(corr)``
 
     (sum_bins |acc|^2 * n_bins - |snr|^2) * snr_norm**2
 
-The sum over bins is one batched kernel for every row of ``corr``. Sine-Gaussian
+Bin sums preserve the native float32 phase recurrence. GPU point vetoes use
+compiled CUDA loops through CuPy/NVRTC and DLPack, avoiding an XLA kernel
+launch per frequency sample. Sine-Gaussian
 chi-squared follows ``SingleDetSGChisq.values``. Tiles come from
 ``pycbc.waveform.sinegauss.fd_sine_gaussian``. The time shift is a multiply by
 ``exp(-2 * pi * i * dt * k * delta_f)``, evaluated for every Q node and every
@@ -45,35 +47,35 @@ def _power_kernel(n_edges, ntime):
         # num_bins is the unpadded edge count minus one, matching len(bins)-1
         # in power_chisq_at_points_from_precomputed.
         rows, support = q.shape
-        slen = ntime
-        # Phase and the prefix sum are float64. A float32 prefix of a
-        # 32 s spectrum subtracts two large partial sums, and the bin sum
-        # then misses the CPU shift-sum by more than the 1e-4 chi-squared
-        # gate. The CPU loop accumulates each bin from zero in float32
-        # after a double-precision angle, which matches this float64 sum.
-        freq = jnp.arange(support, dtype=jnp.float64)
-        phase = ((2.0 * _POINT_PI) * shifts.astype(jnp.float64)[:, None]
-                 * freq[None, :] / jnp.float64(slen))
-        weighted = q.astype(jnp.complex128) * jnp.exp(1j * phase)
-        prefix = jnp.cumsum(weighted, axis=-1)
-        acc = jnp.zeros((rows,), dtype=jnp.float64)
-        row = jnp.arange(rows)
-        for edge in range(n_edges - 1):
-            start = bins[:, edge]
-            end = bins[:, edge + 1]
-            valid = end > start
-            end_i = jnp.clip(end - 1, 0, support - 1)
-            start_i = jnp.clip(start - 1, 0, support - 1)
-            end_val = prefix[row, end_i]
-            start_val = prefix[row, start_i]
-            start_val = jnp.where(start > 0, start_val, 0)
-            piece = jnp.where(valid, end_val - start_val, 0)
-            acc = acc + (piece.real * piece.real + piece.imag * piece.imag)
-        snr64 = snr.astype(jnp.complex128)
-        power = acc * num_bins.astype(jnp.float64) - (
-            snr64.real * snr64.real + snr64.imag * snr64.imag)
-        norms64 = norms.astype(jnp.float64)
-        return (power * (norms64 * norms64)).astype(jnp.float32)
+        start, end = bins[:,:-1], bins[:,1:]
+        # Native point_chisq_code rotates in float32 *within each bin*.
+        # Exact exp(i*k*phase) and a float64 prefix are mathematically more
+        # accurate but differ from that recurrence for long bins. Reproduce
+        # the native arithmetic, parallel over both candidates and bins.
+        phase = (2.0*_POINT_PI)*shifts.astype(jnp.float64)[:,None]/ntime
+        angle = phase*start.astype(jnp.float64)
+        pr, pi = jnp.cos(angle).astype(jnp.float32), jnp.sin(angle).astype(jnp.float32)
+        vsr, vsi = jnp.cos(phase).astype(jnp.float32), jnp.sin(phase).astype(jnp.float32)
+        zero = jnp.zeros_like(pr)
+        width = jnp.maximum(end-start,0)
+        def body(j, carry):
+            pr,pi,real,imag = carry
+            index = start+j
+            value = q[jnp.arange(rows)[:,None],jnp.clip(index,0,support-1)]
+            vr,vi = value.real,value.imag
+            vs,va = vr+vi,vi-vr
+            k1,k2,k3 = jax.lax.optimization_barrier((vr*(pr+pi),pr*va,pi*vs))
+            rr,ii,ri,ir = jax.lax.optimization_barrier((pr*vsr,pi*vsi,pr*vsi,pi*vsr))
+            real = real+jnp.where(j<width,k1-k3,0)
+            imag = imag+jnp.where(j<width,k1+k2,0)
+            return rr-ii,ri+ir,real,imag
+        _,_,real,imag = jax.lax.fori_loop(0,jnp.max(width),body,(pr,pi,zero,zero))
+        pieces = jax.lax.optimization_barrier(real*real)+jax.lax.optimization_barrier(imag*imag)
+        # Match the native sequential accumulation over bins too.
+        acc = jax.lax.fori_loop(0,n_edges-1,lambda i,s:s+pieces[:,i],jnp.zeros(rows,jnp.float32))
+        power = jax.lax.optimization_barrier(acc*num_bins)-(
+            jax.lax.optimization_barrier(snr.real*snr.real)+jax.lax.optimization_barrier(snr.imag*snr.imag))
+        return power*(norms*norms)
 
     return kernel
 
@@ -121,8 +123,11 @@ def power_chisq_batch(q, snr, norms, bins, shifts, num_bins, ntime=None):
         bins = jnp.broadcast_to(bins, (q.shape[0], bins.shape[0]))
     shifts = jnp.asarray(shifts, dtype=jnp.float32).reshape(-1)
     num_bins = jnp.asarray(num_bins, dtype=jnp.float32).reshape(-1)
-    # The live filter leaves x64 off. This sum needs float64 angles and a
-    # float64 prefix; the flag is restored when the context exits.
+    if next(iter(q.devices())).platform == 'gpu':
+        from .jax_cuda import power_chisq_cuda
+        return power_chisq_cuda(q,snr,norms,bins,shifts,num_bins,
+                               numpy.arange(q.shape[0],dtype=numpy.int32),ntime)
+    # Native initializes float32 rotations from double-precision angles.
     with jax.enable_x64(True):
         return _power_kernel(int(bins.shape[1]), ntime)(
             q, shifts, bins, snr, norms, num_bins)
@@ -150,6 +155,10 @@ def power_chisq_selected(q, snr, norms, bins, shifts, num_bins, rows, support):
     The caller discards the padded outputs.
     """
     jax, jnp = _import_jax()
+    q = jnp.asarray(q,dtype=jnp.complex64)
+    if next(iter(q.devices())).platform == 'gpu':
+        from .jax_cuda import power_chisq_cuda
+        return power_chisq_cuda(q,snr,norms,bins,jnp.asarray(shifts,dtype=jnp.float32),num_bins,rows,q.shape[1])
     with jax.enable_x64(True):
         return _selected_power_kernel(int(bins.shape[1]), int(support), q.shape[1])(
             q, snr, norms, bins, shifts, num_bins,
@@ -178,11 +187,17 @@ def power_chisq_candidate_points(q, norms, bins, num_bins, rows, indices,
     each time. ``peaks`` contains normalized complex SNR samples.
     """
     jax, jnp = _import_jax()
+    q = jnp.asarray(q,dtype=jnp.complex64)
+    norms = jnp.asarray(norms,dtype=jnp.float32)
     # Normalize in float32, as the surface is complex64. The accumulation
-    # inside _power_kernel retains float64 phase and prefix precision.
+    # inside _power_kernel uses native-compatible per-bin rotations.
     rows = jnp.asarray(rows, dtype=jnp.int32)
     indices = jnp.asarray(indices, dtype=jnp.int32)
     peaks = jnp.asarray(peaks, dtype=jnp.complex64)
+    if next(iter(q.devices())).platform == 'gpu':
+        from .jax_cuda import power_chisq_cuda
+        return power_chisq_cuda(q,peaks/norms[rows],norms,bins,
+                               indices.astype(jnp.float32),num_bins,rows,q.shape[1],points=True)
     with jax.enable_x64(True):
         return _power_points_kernel(int(bins.shape[1]), int(support), q.shape[1])(
             q, norms, bins, num_bins, rows, indices, peaks)
@@ -267,7 +282,6 @@ def _sg_kernel():
         # stilde (F,), tiles (B, Q, K), k_idx (B, Q, K), gsigma (B, Q),
         # times (B,). k_idx < 0 is padding. Phase matches
         # apply_fseries_time_shift(stilde, -time).
-        freq = k_idx.astype(jnp.float32)
         valid = (k_idx >= 0) & (k_idx < stilde.shape[0])
         safe = jnp.clip(k_idx, 0, stilde.shape[0] - 1)
         data = stilde[safe]
@@ -276,11 +290,28 @@ def _sg_kernel():
         # enough precision to move SG vetoes at late peaks by ~1e-3.
         phi = (2.0 * jnp.pi * times.astype(jnp.float64)
                * delta_f.astype(jnp.float64)).astype(jnp.float32)
-        anchor = (k_idx // 100 * 100).astype(jnp.float32)
-        base = phi[:, None, None] * anchor
-        offset = phi[:, None, None] * (freq-anchor)
-        shift = (jnp.exp(1j * base) * jnp.exp(1j * offset)).astype(tiles.dtype)
-        shifted = data * shift
+        # Tiles have contiguous frequency support. Build each 100-bin
+        # rotation sequence once, rather than doing up to 99 rotations and
+        # a double-precision cosine separately for every frequency sample.
+        first = jnp.maximum(k_idx[:,:,0],0)//100*100
+        groups = (k_idx.shape[-1]+198)//100
+        anchor = first[:,:,None]+100*jnp.arange(groups)[None,None,:]
+        base = (phi[:, None, None] * anchor.astype(jnp.float32)).astype(jnp.float64)
+        real,imag = jnp.cos(base).astype(jnp.float32),jnp.sin(base).astype(jnp.float32)
+        inc_r = jnp.cos(phi.astype(jnp.float64)).astype(jnp.float32)[:,None,None]
+        inc_i = jnp.sin(phi.astype(jnp.float64)).astype(jnp.float32)[:,None,None]
+        def rotate(carry,_):
+            r,i=carry
+            rr,ii,ri,ir=jax.lax.optimization_barrier((r*inc_r,i*inc_i,r*inc_i,i*inc_r))
+            return (rr-ii,ri+ir),(r,i)
+        _,(real_table,imag_table)=jax.lax.scan(rotate,(real,imag),None,length=100)
+        group=jnp.clip((k_idx-first[:,:,None])//100,0,groups-1)
+        row=jnp.arange(k_idx.shape[0])[:,None,None]
+        node=jnp.arange(k_idx.shape[1])[None,:,None]
+        real=real_table[k_idx%100,row,node,group]
+        imag=imag_table[k_idx%100,row,node,group]
+        rr,ii,ri,ir=jax.lax.optimization_barrier((real*data.real,imag*data.imag,real*data.imag,imag*data.real))
+        shifted = jax.lax.complex(rr-ii,ri+ir)
         prod = tiles * shifted
         prod = jnp.where(valid, prod, 0)
         gsnr = jnp.sum(prod, axis=-1)

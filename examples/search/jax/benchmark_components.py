@@ -19,17 +19,30 @@ def measure(call, repeats):
 def benchmark_waveforms(bank, templates, devices, repeats):
     """Same grid/distance, native LAL versus production ripple host-ready path.
 
-    These are serial generators across the bank; filter batch size is unrelated
-    to waveform batching. First_s may include compilation but is not guaranteed
+    Include serial and compiled batched ripple generation. First_s may include compilation but is not guaranteed
     a clean-process cold compilation measurement.
     """
     import jax
     from pycbc import DYN_RANGE_FAC
-    from pycbc.waveform.jax_phenom import _ripple_phenomd, phenomd_implementation
+    from pycbc.waveform.jax_phenom import _ripple_phenomd, phenomd_implementation, generate_imrphenomd_batch
+    from pycbc.pnutils import mass1_mass2_to_mchirp_eta
     if phenomd_implementation() != 'ripple':
         raise RuntimeError('Waveform timing requires real ripplegw IMRPhenomD')
     native = lambda: [bank.get_template(int(t.id), delta_f=t.delta_f) for t in templates]
     result = {'native_lal': measure(native, repeats)}
+    groups={}
+    for t in templates:groups.setdefault((len(t),t.delta_f),[]).append(t)
+    specs=[]
+    for (length,df),group in groups.items():
+        params=[]
+        for t in group:
+            m1,m2=float(t.params.mass1),float(t.params.mass2)
+            c1,c2=float(t.params.spin1z),float(t.params.spin2z)
+            if m1 < m2:c1,c2=c2,c1
+            mc,eta=mass1_mass2_to_mchirp_eta(m1,m2)
+            params.append([mc,eta,c1,c2,1/DYN_RANGE_FAC,0,0,0])
+        lower=np.array([float(t.f_lower) for t in group])
+        specs.append((length,df,params,lower))
     for platform, device in devices.items():
         def generate():
             with jax.default_device(device):
@@ -37,12 +50,16 @@ def benchmark_waveforms(bank, templates, devices, repeats):
                         0, 1/DYN_RANGE_FAC, float(t.params.mass1), float(t.params.mass2),
                         float(t.params.spin1z), float(t.params.spin2z)) for t in templates]
         result['ripple_'+platform] = dict(device=str(device), **measure(generate, repeats))
+        def generate_batch():
+            return [np.asarray(generate_imrphenomd_batch(length,df,params,low,low,
+                    (length-1)*df,device)) for length,df,params,low in specs]
+        result['ripple_batch_'+platform] = dict(device=str(device), **measure(generate_batch,repeats))
     for item in result.values():
         item['speedup_vs_native_lal'] = result['native_lal']['median_s']/item['median_s']
     import matplotlib
     matplotlib.use('Agg')
     # Caller saves the JSON; a paired component plot is made by plot_components.
-    return dict(scope='full-bank serial waveform generation, host-ready complex64; no filtering',
+    return dict(scope='full-bank serial and compiled batched waveform generation, host-ready complex64; no filtering',
                 templates=len(templates), timings=result)
 
 

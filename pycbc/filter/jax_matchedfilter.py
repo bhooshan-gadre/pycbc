@@ -12,6 +12,7 @@ filter uses that CPU series instead. The comparison is always logged.
 """
 
 import functools
+from collections import OrderedDict
 import logging
 import time as _time
 
@@ -38,6 +39,25 @@ from pycbc.vetoes.jax_chisq import (
 )
 
 logger = logging.getLogger('pycbc.filter.jax_matchedfilter')
+
+
+def _cpu_point_chisq(q,snr,norms,bins,shifts,num_bins,rows,support):
+    """Native compiled point loops for CPU-resident correlations only.
+
+    Avoid an XLA CPU while-loop iteration per frequency. This is never a
+    fallback for GPU arrays, which use the compiled CUDA implementation.
+    """
+    from pycbc.types import Array
+    from pycbc.vetoes.chisq_cpu import shift_sum
+    if next(iter(q.devices())).platform != 'cpu':
+        raise ValueError('CPU point veto cannot consume GPU correlations')
+    corr,peaks,weights,edges,indices=map(numpy.asarray,(q,snr,norms,bins,shifts))
+    result=numpy.empty(len(rows),dtype=numpy.float32)
+    for i,row in enumerate(rows):
+        count=int(num_bins[row])
+        acc=shift_sum(Array(corr[row],copy=False),[indices[row]],edges[row,:count+1])
+        result[i]=(acc[0]*count-(peaks[row].conjugate()*peaks[row]).real)*float(weights[row])**2
+    return result
 
 # Only replace the bank series when the generated waveform is close enough
 # that a weak trigger cannot move by more than the 1e-4 relative SNR gate.
@@ -344,6 +364,7 @@ class _DurationGroup(object):
             jnp.zeros((self.nbatch, self.ntime), dtype=jnp.complex64), device)
         self.unnorm = None
         self.psd_key = None
+        self._psd_cache = OrderedDict()
         self.sigmasq = None
         self.norms = None
         self.bins = None
@@ -384,6 +405,13 @@ class _DurationGroup(object):
         """Recompute sigmasq, chi-squared edges, and tiles when the PSD changes."""
         key = (id(psd), int(len(stilde)))
         if key == self.psd_key and self.norms is not None:
+            return
+        cached = self._psd_cache.get(key)
+        if cached is not None and cached[0] is psd:
+            for name, value in cached[1].items():
+                setattr(self, name, value)
+            self.psd_key = key
+            self._psd_cache.move_to_end(key)
             return
         jax, jnp = _import_jax()
         sigmasq = numpy.empty(self.nbatch, dtype=numpy.float64)
@@ -437,6 +465,12 @@ class _DurationGroup(object):
                 'delta_f': bundle['delta_f'],
             }
         self.psd_key = key
+        names = ('sigmasq','num_bins','power_stop','bins','norms','num_bins_d','sg')
+        self._psd_cache[key] = (psd,{name:getattr(self,name) for name in names})
+        # Keep the common H1/L1/V1 weights; hold PSD references to prevent
+        # Python id reuse. Replaced PSDs are evicted instead of growing forever.
+        while len(self._psd_cache) > 3:
+            self._psd_cache.popitem(last=False)
 
     def set_strain(self, stilde):
         """Transfer this block once, without an additional scatter copy."""
@@ -462,8 +496,8 @@ class JaxLiveBatchMatchedFilter(object):
                  max_batch_latency_ms=None, waveform_source="auto", profile_stages=False):
         if device_id is not None:
             processing_device_id = device_id
-        if waveform_source not in ('auto', 'bank'):
-            raise ValueError('waveform_source must be auto or bank')
+        if waveform_source not in ('auto', 'bank', 'ripple'):
+            raise ValueError('waveform_source must be auto, bank or ripple')
         self.profile_stages = profile_stages
         self.last_profile = {}
         self.waveform_source = waveform_source
@@ -480,7 +514,14 @@ class JaxLiveBatchMatchedFilter(object):
 
         self.device, self.gpu_available = configure_jax(
             jax_platform, processing_device_id)
+        self.veto_backend = 'native-cython-point'
+        if self.device.platform == 'gpu' and self.power_chisq.do:
+            from pycbc.vetoes.jax_cuda import _kernels
+            _kernels(self.device.local_hardware_id)
+            self.veto_backend = 'cuda-nvrtc-native-recurrence'
+        logger.info('JAX live power veto backend: %s',self.veto_backend)
         self.startup_comparisons = []
+        self.waveform_metrics = dict(generation_s=0.,validation_s=0.,source=waveform_source)
         self.autotune = autotune
         self.tuning_candidates = tuple(sorted(set(int(x) for x in tuning_candidates)))
         if not self.tuning_candidates or min(self.tuning_candidates) < 1 or tuning_repeats < 1:
@@ -520,6 +561,8 @@ class JaxLiveBatchMatchedFilter(object):
 
     def _prepare_group(self, group):
         """Build the complex64 series actually filtered for one duration group."""
+        if self.waveform_source == 'ripple':
+            return self._prepare_ripple_group(group)
         chosen = []
         for template in group:
             generated, report = self._generate_and_compare(template)
@@ -529,6 +572,40 @@ class JaxLiveBatchMatchedFilter(object):
             else:
                 chosen.append(numpy.array(template, dtype=numpy.complex64, copy=True))
         return numpy.stack(chosen, axis=0)
+
+    def _prepare_ripple_group(self, group):
+        from pycbc.waveform.jax_phenom import generate_imrphenomd_batch, _f_ref_hz, waveform_sample_agreement
+        from pycbc.pnutils import mass1_mass2_to_mchirp_eta
+        if any(_approximant_name(t) != 'IMRPhenomD' for t in group):
+            raise ValueError('Strict ripple waveform source requires an IMRPhenomD bank')
+        self.waveform_metrics.update(implementation='ripplegw-jit-vmap',device=str(self.device),
+                                     precision='float64 generation, complex64 filtering')
+        params, lower, refs, final = [], [], [], []
+        for t in group:
+            m1,m2=float(_param(t,'mass1')),float(_param(t,'mass2'))
+            c1,c2=float(_param(t,'spin1z',0)),float(_param(t,'spin2z',0))
+            if m1 < m2:c1,c2=c2,c1
+            mc,eta=mass1_mass2_to_mchirp_eta(m1,m2)
+            params.append([mc,eta,c1,c2,1./__import__('pycbc').DYN_RANGE_FAC,0.,0.,0.])
+            lower.append(float(t.f_lower))
+            refs.append(_f_ref_hz(_param(t,'f_ref',0),t.f_lower))
+            final.append(float(getattr(t,'end_frequency',0) or (len(t)-1)*t.delta_f))
+        began=_time.perf_counter()
+        bank=generate_imrphenomd_batch(len(group[0]),group[0].delta_f,params,lower,refs,final,self.device)
+        bank.block_until_ready()
+        self.waveform_metrics['generation_s']+=_time.perf_counter()-began
+        began=_time.perf_counter()
+        host=numpy.asarray(bank)
+        for t,h in zip(group,host):
+            ref=numpy.asarray(t)
+            agreement=waveform_sample_agreement(ref,h,_WAVEFORM_MISMATCH_LIMIT)
+            if not agreement['passed']:
+                raise ValueError('Compiled ripple waveform failed native IMRPhenomD validation for template %s: %s' % (t.id,agreement))
+            self.startup_comparisons.append(dict(approximant='IMRPhenomD',template_id=int(t.id),
+                implementation='ripple-batched',use_generated=True,**agreement))
+        self.waveform_metrics['validation_s']+=_time.perf_counter()-began
+        logger.info('Compiled ripple IMRPhenomD batch: templates=%s grid=%s device=%s',len(group),len(group[0]),self.device)
+        return bank
 
     def _generate_and_compare(self, template):
         """Compare the JAX generator to the bank series and to reference models."""
@@ -893,7 +970,9 @@ class JaxLiveBatchMatchedFilter(object):
             row = numpy.asarray(group['row'], dtype=numpy.int32)
             if self.power_chisq.do:
                 selected = _bucket_rows(row, state.nbatch)
-                raw = power_chisq_selected(
+                point_veto = (_cpu_point_chisq if self.device.platform == 'cpu'
+                              else power_chisq_selected)
+                raw = point_veto(
                     state.q, state.peak_unnorm, state.norms, state.bins,
                     state.index, state.num_bins_d, selected, state.power_stop)
                 raw = numpy.asarray(raw, dtype=numpy.float32)[:row.size]
@@ -946,3 +1025,23 @@ def _bucket_rows(rows, maximum):
     """
     size = min(maximum, 1 << (int(len(rows)) - 1).bit_length())
     return numpy.pad(rows, (0, size - len(rows)), mode='edge')
+
+
+def use_ripple_reference(templates):
+    """Install CPU ripple arrays in a native bank for identical-model controls.
+
+    Retain IDs/parameters and native FFTW filtering. LAL waveforms are checked
+    before replacement. The temporary generation-only engine allocates no
+    matched-filter surfaces and does not run/tune any filtering.
+    """
+    from types import SimpleNamespace
+    from pycbc.types import Array
+    engine=JaxLiveBatchMatchedFilter(list(templates),0,'0',SimpleNamespace(do=False),
+        jax_platform='cpu',waveform_source='ripple',autotune=True)
+    for group,series in zip(engine.tgroups,engine._series):
+        for template,value in zip(group,numpy.asarray(series)):
+            template[:]=Array(value,copy=False)
+            template._sigmasq={}
+            for name in ('sigma_view','sslice','sigma_scale'):
+                if hasattr(template,name):delattr(template,name)
+    return dict(waveforms=engine.startup_comparisons,**engine.waveform_metrics)

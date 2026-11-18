@@ -1,5 +1,9 @@
 # Diagnose and reduce JAX live-search latency
 
+For strict compiled/batched ripple IMRPhenomD, native-compatible CUDA vetoes,
+the multi-detector PSD cache and updated GPU validation commands, see
+[COMPILED_RIPPLE_GPU.md](COMPILED_RIPPLE_GPU.md).
+
 The supplied native-example measurements were:
 
 | Backend | First run (s) | Next run (s) | Third run (s) |

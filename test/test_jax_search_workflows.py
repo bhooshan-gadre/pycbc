@@ -161,11 +161,11 @@ def test_vetoes_only_process_retained_and_activated_rows(bank_and_reader, monkey
     bank, reader = bank_and_reader
     cpu, engine = engines(bank, max_triggers_in_batch=1)
     seen = []
-    original = module.power_chisq_selected
+    original = module._cpu_point_chisq
     def observe(q, snr, norms, bins, shifts, num_bins, rows, support):
         seen.append((len(rows), support, q.shape))
         return original(q, snr, norms, bins, shifts, num_bins, rows, support)
-    monkeypatch.setattr(module, 'power_chisq_selected', observe)
+    monkeypatch.setattr(module, '_cpu_point_chisq', observe)
     # Force all SG candidates below its activation threshold: no SG kernel call.
     engine.sg_chisq.snr_threshold = cpu.sg_chisq.snr_threshold = 100
     def unexpected(*args, **kwargs):
@@ -201,6 +201,58 @@ def test_serial_chunks_reuse_strain_but_refresh_each_block(bank_and_reader):
         actual = engine.process_data(reader)
         assert len(calls) == len(set(calls)) == 1
         fixture.assert_parity(expected, actual, 'fresh block and PSD')
+
+
+def test_three_detector_psd_weights_are_reused(bank_and_reader):
+    bank,reader=bank_and_reader
+    _,engine=engines(bank)
+    original=reader._stilde.psd
+    expected=engine.process_data(reader)
+    norms=[s.norms for s in engine._states]
+    for factor in [1.1,1.3]:
+        reader._psd=original*factor
+        engine.process_data(reader)
+    reader._psd=original
+    actual=engine.process_data(reader)
+    assert all(s.norms is n for s,n in zip(engine._states,norms))
+    assert all(len(s._psd_cache)==3 for s in engine._states)
+    fixture.assert_parity(expected,actual,'three detector PSD cache')
+
+
+def test_long_bin_veto_matches_native_rotation_arithmetic():
+    rng=np.random.default_rng(681)
+    ntime=262144
+    q=(rng.normal(size=(2,ntime))+1j*rng.normal(size=(2,ntime))).astype('complex64')*.01
+    q[:,ntime//2+1:]=0
+    bins=np.array([1000,5000,18000,60000,120000],dtype=np.int32)
+    shifts=np.array([127999,188001],dtype=np.float32)
+    snr=np.array([.5+.2j,-.3+.4j],dtype=np.complex64)
+    norms=np.array([.3,.2],dtype=np.float32)
+    actual=np.asarray(power_chisq_batch(q,snr,norms,bins,shifts,np.full(2,4)))
+    with CPUScheme(num_threads=1):
+        expected=np.array([power_chisq_at_points_from_precomputed(
+            Array(q[i]),snr[i:i+1],float(norms[i]),bins,[shifts[i]])[0] for i in range(2)])
+    np.testing.assert_allclose(actual,expected,rtol=3e-5,atol=1e-5)
+
+
+def test_sg_shift_matches_native_at_late_times():
+    from pycbc.vetoes.jax_chisq import sg_chisq_batch
+    from pycbc.waveform.utils import apply_fseries_time_shift
+    rng=np.random.default_rng(92)
+    data=(rng.normal(size=65537)+1j*rng.normal(size=65537)).astype('complex64')
+    indices=np.stack([np.arange(10037,10837),np.arange(20481,21281)])[:,None,:].astype('int32')
+    tiles=(rng.normal(size=indices.shape)+1j*rng.normal(size=indices.shape)).astype('complex64')
+    times=np.array([31.96728515625,63.99951171875],dtype='float32')
+    gsigma=np.full((2,1),10.,dtype='float32');df=1/64
+    actual=np.asarray(sg_chisq_batch(data,tiles,indices,gsigma,times,df))
+    expected=[]
+    with CPUScheme(num_threads=1):
+        spectrum=FrequencySeries(data,delta_f=df)
+        for row,t in enumerate(times):
+            shifted=np.asarray(apply_fseries_time_shift(spectrum,-float(t)))
+            z=(tiles[row,0]*shifted[indices[row,0]]).sum()*(4*df/10.)
+            expected.append(abs(z)**2/2)
+    np.testing.assert_allclose(actual,expected,rtol=3e-5,atol=1e-6)
 
 
 def test_truncated_selected_chisq_keeps_original_fft_phase_length():

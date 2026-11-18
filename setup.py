@@ -185,6 +185,11 @@ extras_require = {
         'jax>=0.4',
         'ripplegw>=0.5',
     ],
+    'jax-cuda12': [
+        'jax>=0.4',
+        'ripplegw>=0.5',
+        'cupy-cuda12x>=12',
+    ],
 }
 
 def get_reqs_from_file(filename):

@@ -32,17 +32,19 @@ def test_native_options_preserve_models_and_search_settings():
     assert runner.values(args,'--frame-src') == ['H1:strain/H1/*','L1:strain/L1/*','V1:strain/V1/*']
 
 
-def test_plan_reuses_bank_and_only_changes_backend(tmp_path):
+@pytest.mark.parametrize('phenom',[False,True])
+def test_plan_reuses_bank_and_only_changes_backend(tmp_path,phenom):
     (tmp_path/'bank.hdf').write_bytes(b'bank')
     (tmp_path/'H1-test.gwf').write_bytes(b'frame')
-    base=['--bank-file','bank.hdf','--frame-src','H1:H1-*.gwf','--sample-rate','512',
+    base=['--bank-file','bank.hdf','--approximant','SPAtmplt:mtotal<4','SEOBNRv4_ROM:else',
+          '--frame-src','H1:H1-*.gwf','--sample-rate','512',
           '--output-path','output','--run-snr-optimization','--snr-opt-extra-opts','--foo bar']
     path=tmp_path/'args.json';path.write_text(json.dumps(base))
     out=tmp_path/'runs'
     result=subprocess.run([sys.executable,str(ROOT/'examples/live/run_backend_comparison.py'),
         '--example-dir',str(tmp_path),'--args-json',str(path),'--output',str(out),'--plan-only',
         '--profile-stages','--jax-preprocessing','condition','--coordinator-gpu',
-        '--allow-gpu-sharing'],
+        '--allow-gpu-sharing',*(['--waveform-model','IMRPhenomD','--reference-waveforms','ripple'] if phenom else [])],
         text=True,capture_output=True)
     assert result.returncode == 0,result.stdout+result.stderr
     m=json.loads((out/'runs.json').read_text())
@@ -53,12 +55,14 @@ def test_plan_reuses_bank_and_only_changes_backend(tmp_path):
         assert '--run-snr-optimization' not in row['command']
         assert '--foo bar' not in row['command']
         assert runner.values(row['command'],'--bank-file') == ['bank.hdf']
+        assert runner.values(row['command'],'--approximant') == (['IMRPhenomD'] if phenom else ['SPAtmplt:mtotal<4','SEOBNRv4_ROM:else'])
+        assert runner.values(row['command'],'--bank-waveform-source') == ['ripple' if phenom else 'lal']
         assert '--stage-profile-dir' in row['command']
         assert ('--jax-coordinator-preprocessing' in row['command']) == (row['mode'] == 'jax_gpu')
         assert ('--jax-allow-gpu-sharing' in row['command']) == (row['mode'] == 'jax_gpu')
         assert ('--jax-autotune' in row['command']) == (row['mode'] == 'jax_gpu')
         if row['mode'] != 'native':
-            assert runner.values(row['command'],'--jax-waveform-source') == ['bank']
+            assert runner.values(row['command'],'--jax-waveform-source') == ['ripple' if phenom else 'bank']
             assert runner.values(row['command'],'--jax-preprocessing') == ['condition']
     # Preparation/comparison must never delete the native example output.
     (tmp_path/'output').mkdir();(tmp_path/'output'/'keep.txt').write_text('keep')

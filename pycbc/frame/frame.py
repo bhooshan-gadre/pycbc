@@ -661,11 +661,26 @@ class DataBuffer(object):
                 raise RuntimeError
 
             keys.append(name)
+        # Adjacent analysis blocks often use the same long frame. Reopening
+        # it and retrieving channel metadata can repeatedly decompress its
+        # vectors. Reuse the stream only while every file is unchanged and
+        # no explicit cache refresh has replaced that stream.
+        try:
+            signature = tuple((name, st.st_dev, st.st_ino, st.st_size,
+                               st.st_mtime_ns, st.st_ctime_ns)
+                              for name in keys for st in [os.stat(name)])
+        except OSError as exc:
+            raise RuntimeError('Frame changed while updating cache') from exc
+        if (signature == getattr(self, '_increment_cache_signature', None) and
+                self.stream is getattr(self, '_increment_cache_stream', None)):
+            return
         cache = locations_to_cache(keys)
         stream = lalframe.FrStreamCacheOpen(cache)
         self.stream = stream
         self.channel_type, self.raw_sample_rate = \
             self._retrieve_metadata(self.stream, self.channel_name)
+        self._increment_cache_signature = signature
+        self._increment_cache_stream = stream
 
     def attempt_advance(self, blocksize, timeout=10):
         """ Attempt to advance the frame buffer. Retry upon failure, except
@@ -691,6 +706,11 @@ class DataBuffer(object):
                     self.update_cache_by_increment(blocksize)
                 return DataBuffer.advance(self, blocksize)
             except RuntimeError:
+                # A failed LAL read can leave a stream in an error state.
+                # Preserve the original retry behavior by reopening it.
+                if self.increment_update_cache:
+                    self._increment_cache_signature = None
+                    self._increment_cache_stream = None
                 if pycbc.gps_now() > timeout + self.raw_buffer.end_time:
                     # The frame is not there and it should be by now,
                     # so we give up and treat it as zeros

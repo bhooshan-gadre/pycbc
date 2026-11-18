@@ -536,6 +536,7 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
                     workspace[name] = ValidationFilter(list(templates), snr_threshold=0,
                         chisq_bins='8', sg_chisq=sg(), jax_platform=platform_name,
                         processing_device_id=device.id, maxelements=ntime if mode == 'serial' else 2**27,
+                        waveform_source='ripple' if model == 'IMRPhenomD' else 'auto',
                         autotune=mode == 'tuned', tuning_repeats=args.tuning_repeats,
                         memory_budget_mb=args.memory_budget_mb)
                 engine = workspace[name]
@@ -581,7 +582,7 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
                 del control, engine
     metrics = {}
     for name, product in products.items():
-        model_comparison = model == 'IMRPhenomD' and name.startswith('jax_')
+        model_comparison = model == 'IMRPhenomD' and name.startswith('jax_') and getattr(args,'reference_waveforms','lal') == 'lal'
         aligned, changed = align_peak_vetoes(product, native['result'], ids, reader,
             start, lambda row, index: evaluate_mode(name, row, index))
         m, errors = compare_products(native['result'], product['result'], native['rho'], product['rho'],
@@ -598,10 +599,10 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
         # Keep strict cross-model peak/surface gates; off-peak veto differences
         # are reported, while kernel veto accuracy uses the exact-waveform
         # independent CPU control above. TaylorF2 uses identical waveforms.
-        if model != 'IMRPhenomD' or not name.startswith('jax_'):
+        if not model_comparison:
             errors.extend(ce)
             failures.extend([name + ': ' + e for e in ce])
-        m['cross_model_veto_curves_gated'] = model != 'IMRPhenomD' or not name.startswith('jax_')
+        m['cross_model_veto_curves_gated'] = not model_comparison
         m['passed'] = not errors and metadata.get(name, {}).get('filter_only', {}).get('passed', True)
     # Direct serial/batch and CPU/GPU comparisons include independently
     # generated waveforms on the respective devices, not a shared host bank.
@@ -659,9 +660,9 @@ def run_case(args, model, bank, templates, reader, start, stop, directory, devic
         np.savez_compressed(directory/'arrays.npz', **arrays)
     report = dict(model=model, templates=len(templates), dataset=directory.name,
         native_fft_backend=args.fft_backend,
-        fft_length=ntime, valid_length=stop-start, waveform_sources=dict(
+        fft_length=ntime, valid_length=stop-start, reference_waveforms=getattr(args,'reference_waveforms','lal') if model == 'IMRPhenomD' else 'lal', waveform_sources=dict(
             TaylorF2='regular LAL TaylorF2, copied to the selected filter device',
-            IMRPhenomD='ripplegw generated under the selected JAX device context'),
+            IMRPhenomD='compiled batched ripplegw generated and retained on the selected device'),
         metrics=metrics, timings=timings, implementations=metadata,
         injection=injection, injection_checks=injection_checks,
         jax_cpu_serial_consistency=consistency,
@@ -686,6 +687,8 @@ def main():
     parser.add_argument('--fft-backend', choices=['fftw', 'numpy'], default='fftw',
         help='Native CPU FFT backend for serial/batch filtering and data preparation (default: fftw); JAX FFTs are unchanged')
     parser.add_argument('--approximants', nargs='+', choices=['IMRPhenomD', 'TaylorF2'], default=['IMRPhenomD', 'TaylorF2'])
+    parser.add_argument('--reference-waveforms',choices=['lal','ripple'],default='lal',
+                        help='ripple uses identical-model CPU FFTW references; lal also tests cross-model agreement')
     parser.add_argument('--bank-sizes', type=int, nargs='+', default=[10, 20])
     parser.add_argument('--repeats', type=int, default=11)
     parser.add_argument('--veto-samples', type=int, default=65)
@@ -742,6 +745,9 @@ def main():
         # Actually compile/execute FP32 FFT and FP64 arithmetic on every device.
         import jax.numpy as jnp
         for device in devices.values():
+            if device.platform == 'gpu':
+                from pycbc.vetoes.jax_cuda import _kernels
+                _kernels(device.local_hardware_id)
             with jax.default_device(device):
                 fft = jax.jit(lambda x: jnp.fft.ifft(x))(jnp.ones(32, dtype=jnp.complex64))
                 assert_device(fft, device, 'FFT preflight'); fft.block_until_ready()
@@ -754,6 +760,7 @@ def main():
         with CPUScheme(num_threads=1):
             report['native_fft_backend'] = select_native_fft_backend(args.fft_backend)
             print('Native CPU FFT backend: ' + report['native_fft_backend']['module'], flush=True)
+            print('IMRPhenomD CPU reference waveform source: '+args.reference_waveforms,flush=True)
             for model in args.approximants:
                 for count in args.bank_sizes:
                     directory = args.output / model / ('n'+str(count))
@@ -764,6 +771,9 @@ def main():
                         from benchmark_components import benchmark_waveforms
                         save_json(directory/'waveform_timings.json', benchmark_waveforms(
                             bank, templates, devices, args.repeats))
+                    if args.reference_waveforms == 'ripple' and model == 'IMRPhenomD':
+                        from pycbc.filter.jax_matchedfilter import use_ripple_reference
+                        save_json(directory/'reference_waveforms.json',use_ripple_reference(templates))
                     for dataset, reader in readers.items():
                         output = directory/dataset
                         output.mkdir(exist_ok=True)

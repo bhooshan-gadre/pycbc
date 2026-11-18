@@ -29,7 +29,7 @@ def memory_estimate(groups, batch, sg=None):
         tiles = q * (12*width + 4)
         # Power bins cannot have more edges than frequency samples. Allow
         # scalar weights/epochs and shared PSD/strain/k-index vectors as well.
-        resident += len(group) * (8*(f+2*n) + 4*f + tiles + 128) + 32*f
+        resident += len(group) * (8*(f+2*n) + 3*(4*f + tiles + 128)) + 32*f
         padded = 1 << (min(batch, len(group))-1).bit_length()
         scratch = max(scratch, padded * (n*8*4 + q*width*32))
     return resident + scratch

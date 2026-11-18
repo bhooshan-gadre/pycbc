@@ -62,6 +62,23 @@ def test_required_gpu_cannot_pass_on_cpu(tmp_path):
     assert 'GPU required but unavailable' in summary['error']
 
 
+def test_compiled_ripple_identical_model_reference(tmp_path):
+    pytest.importorskip('ripplegw')
+    result=run(tmp_path,'--gpu','off','--approximants','IMRPhenomD',
+        '--reference-waveforms','ripple','--bank-sizes','2','--repeats','1','--veto-samples','3')
+    assert result.returncode==0,result.stdout+result.stderr
+    report=json.loads((tmp_path/'summary.json').read_text())
+    assert report['status']=='PASS_CPU_ONLY_GPU_NOT_TESTED'
+    for case in report['cases']:
+        assert case['reference_waveforms']=='ripple'
+        assert case['passed']
+        for name,metadata in case['implementations'].items():
+            assert metadata['filter_only']['passed']
+            assert all(w['implementation']=='ripple-batched' for w in metadata['waveforms'])
+            assert case['metrics'][name]['cross_model_veto_curves_gated']
+    assert (tmp_path/'IMRPhenomD/n2/reference_waveforms.json').is_file()
+
+
 @pytest.mark.parametrize('backend', ['fftw', 'numpy'])
 def test_cpu_smoke_outputs_eight_second_arrays_and_plots(tmp_path, backend):
     from pycbc.fft import backend_cpu

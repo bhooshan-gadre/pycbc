@@ -963,8 +963,10 @@ parser.add_argument('--filter-backend', choices=['cpu', 'jax'], default='cpu',
 parser.add_argument('--jax-platform', choices=['cpu', 'gpu'], default='cpu',
                     help='JAX platform for ranks whose filter backend is jax. '
                          'GPU assignment uses --jax-device-id and respects scheduler visibility.')
-parser.add_argument('--jax-waveform-source', choices=['auto', 'bank'], default='auto',
+parser.add_argument('--jax-waveform-source', choices=['auto', 'bank', 'ripple'], default='auto',
                     help='bank filters the exact native waveform arrays, including SEOBNRv4_ROM')
+parser.add_argument('--bank-waveform-source',choices=['lal','ripple'],default='lal',
+                    help='Explicit CPU ripple reference bank for identical-model FFTW/JAX comparisons; requires IMRPhenomD')
 parser.add_argument('--jax-coordinator-preprocessing', action='store_true',
                     help='Also offload rank-0 conditioning; reserves an additional GPU unless sharing is explicitly allowed')
 parser.add_argument('--jax-preprocessing', choices=['off','whiten','condition'], default='off',
@@ -1209,10 +1211,18 @@ with ctx:
             exit()
 
     _filter_setup_s = 0.
+    _bank_generation_s = 0.
+    _reference_waveforms = None
     if evnt.rank > 0:
         _filter_setup_start = time.perf_counter()
         bank.table.sort(order='mchirp')
+        _bank_generation_start = time.perf_counter()
         waveforms = list(bank[evnt.rank-1::evnt.size-1])
+        _bank_generation_s = time.perf_counter()-_bank_generation_start
+        if args.bank_waveform_source == 'ripple':
+            from pycbc.filter.jax_matchedfilter import use_ripple_reference
+            _reference_waveforms = use_ripple_reference(waveforms)
+            logging.info('Native template bank source: compiled CPU ripple (identical-model control)')
         check_max_length(args, waveforms)
         if filter_backend == 'jax':
             from pycbc.filter.jax_matchedfilter import JaxLiveBatchMatchedFilter
@@ -1270,6 +1280,8 @@ with ctx:
         for ifo in (evnt.ifos if evnt.rank == 0 else evnt.trigg_ifos)
     }
     evnt.data_readers = data_reader
+    for reader in data_reader.values():
+        reader.profile_stages = bool(args.stage_profile_dir)
     _conditioning_device = None
     if evnt.rank > 0 and filter_backend == 'jax' and args.jax_preprocessing != 'off':
         _conditioning_device = mf.device
@@ -1354,6 +1366,11 @@ with ctx:
         profile_handle.write(json.dumps(dict(phase='startup', rank=evnt.rank,
             setup_to_loop_s=time.perf_counter()-_python_entry_start,
             template_filter_setup_s=_filter_setup_s,
+            native_bank_generation_s=_bank_generation_s,
+            reference_waveforms=_reference_waveforms,
+            bank_waveform_source=args.bank_waveform_source,
+            jax_waveforms=mf.waveform_metrics if evnt.rank > 0 and filter_backend == 'jax' else None,
+            veto_backend=mf.veto_backend if evnt.rank > 0 and filter_backend == 'jax' else 'native',
             templates=len(waveforms) if evnt.rank > 0 else 0,
             jax_device=str(mf.device) if evnt.rank > 0 and filter_backend == 'jax' else None,
             device_kind=mf.device.device_kind if evnt.rank > 0 and filter_backend == 'jax' else None,
@@ -1379,6 +1396,8 @@ with ctx:
                 timeout=args.frame_read_timeout
             )
             det_profile = dict(advance_s=time.perf_counter()-stage_began)
+            if args.stage_profile_dir:
+                det_profile['preprocessing'] = data_reader[ifo].last_preprocessing_profile.copy()
             stage_profile['detectors'][ifo] = det_profile
             stage_began = time.perf_counter()
             if status and psd_count[ifo] == 0:
