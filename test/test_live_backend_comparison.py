@@ -120,3 +120,40 @@ def test_explicit_native_bank_source_bypasses_waveform_regeneration():
     value,report=engine._generate_and_compare(Template())
     assert value is None and report['implementation']=='native-bank'
     assert not report['use_generated'] and report['match_template']==1.
+
+
+@pytest.mark.parametrize('mpi_version,openmpi', [('HYDRA build details',False),
+                                                ('mpiexec (OpenRTE) 4.1.6',True)])
+def test_native_example_launcher_accepts_hydra_and_openmpi(tmp_path,mpi_version,openmpi):
+    # Reach the real run.sh launch path using pre-existing fixture names. The
+    # recording launcher stops before the example's post-search checks.
+    for name in ['template_bank.hdf','injections.hdf','single_significance_fits.hdf',
+                 'H1-fit_coeffs.hdf','L1-fit_coeffs.hdf','V1-fit_coeffs.hdf','statHL.hdf']:
+        (tmp_path/name).touch()
+    (tmp_path/'strain').mkdir()
+    launcher=tmp_path/'launcher'
+    record=tmp_path/'launch.json'
+    launcher.write_text('#!'+sys.executable+'\n'+'''import json,os,sys
+if '--version' in sys.argv:
+    print(os.environ['TEST_MPI_VERSION'])
+    sys.exit(0)
+with open(os.environ['TEST_MPI_RECORD'],'w') as handle:
+    json.dump(dict(args=sys.argv[1:],token=os.environ.get('TEST_EXPORT_TOKEN')),handle)
+sys.exit(37)
+''')
+    launcher.chmod(0o755)
+    (tmp_path/'pycbc_live').write_text('#!/bin/sh\nexit 0\n')
+    (tmp_path/'pycbc_live').chmod(0o755)
+    env=dict(os.environ,PYCBC_MPIEXEC=str(launcher),TEST_MPI_VERSION=mpi_version,
+             TEST_MPI_RECORD=str(record),TEST_EXPORT_TOKEN='inherited',
+             PATH=str(tmp_path)+os.pathsep+os.environ['PATH'])
+    result=subprocess.run(['bash',str(ROOT/'examples/live/run.sh')],cwd=tmp_path,
+                           env=env,capture_output=True,text=True)
+    assert result.returncode==37,result.stdout+result.stderr
+    actual=json.loads(record.read_text())
+    assert actual['token']=='inherited'
+    args=actual['args']
+    assert args[:2]==['-n','2']
+    assert '-x' not in args and '-host' not in args
+    assert ('--bind-to' in args)==openmpi
+    assert runner.values(args,'--approximant')==['SPAtmplt:mtotal<4','SEOBNRv4_ROM:else']
