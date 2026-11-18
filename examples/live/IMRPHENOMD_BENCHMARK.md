@@ -148,3 +148,7 @@ Regression checks (the last command uses simulated GPU masks, not CUDA):
 python -m pytest -q test/test_jax_devices_tuning.py test/test_jax_live_benchmark.py
 PYCBC_TEST_MPI=1 python -m pytest -q test/test_jax_devices_mpi.py
 ```
+
+For the original `run.sh` bank, frames and SPAtmplt/SEOBNRv4_ROM choices, use
+[NATIVE_BACKEND_COMPARISON.md](NATIVE_BACKEND_COMPARISON.md). That comparison
+keeps the exact native waveform arrays on both JAX platforms.

@@ -10,6 +10,7 @@ launched with mpirun.
 See https://arxiv.org/abs/1805.11174 for an overview."""
 
 import sys
+import time
 import argparse, numpy, pycbc, logging, cProfile, h5py, json
 import os.path
 import itertools
@@ -961,6 +962,9 @@ parser.add_argument('--filter-backend', choices=['cpu', 'jax'], default='cpu',
 parser.add_argument('--jax-platform', choices=['cpu', 'gpu'], default='cpu',
                     help='JAX platform for ranks whose filter backend is jax. '
                          'GPU assignment uses --jax-device-id and respects scheduler visibility.')
+parser.add_argument('--jax-waveform-source', choices=['auto', 'bank'], default='auto',
+                    help='bank filters the exact native waveform arrays, including SEOBNRv4_ROM')
+parser.add_argument('--latency-log', help='Rank-0 per-block monotonic timings in JSONL (new file)')
 parser.add_argument('--jax-device-id', default='auto',
                     help='auto assigns distinct scheduler-visible GPUs per node; or a visible index')
 parser.add_argument('--jax-allow-gpu-sharing', action='store_true',
@@ -1214,6 +1218,7 @@ with ctx:
                 maxelements=args.max_batch_size,
                 jax_platform=args.jax_platform,
                 device_id=0,
+                waveform_source=args.jax_waveform_source,
                 autotune=args.jax_autotune,
                 tuning_candidates=args.jax_tuning_candidates,
                 tuning_repeats=args.jax_tuning_repeats,
@@ -1317,7 +1322,12 @@ with ctx:
     }
     psd_var_filts = {ifo: None for ifo in evnt.trigg_ifos}
 
+    latency_handle = None
+    if args.latency_log and evnt.rank == 0:
+        latency_handle = open(args.latency_log, 'x', buffering=1)
     while data_end() < args.end_time:
+        block_started_monotonic = time.perf_counter()
+        block_gps_start = float(data_end())
         t1 = pycbc.gps_now()
         logging.info('Analyzing from %s', data_end())
 
@@ -1512,6 +1522,14 @@ with ctx:
                      tdiff, tdiff / valid_pad, lag, len(evnt.live_detectors)
         )
 
+        if latency_handle is not None:
+            latency_handle.write(json.dumps(dict(
+                gps_start=block_gps_start, gps_end=float(data_end()),
+                elapsed_s=time.perf_counter()-block_started_monotonic,
+                analysis_chunk_s=valid_pad,
+                live_detectors=sorted(evnt.live_detectors),
+                historical_data_lag_s=lag)) + '\n')
+
         if args.output_status is not None and evnt.rank == 0:
             if lag > 120:
                 status_intervals = [{'num_status': 2,
@@ -1536,6 +1554,9 @@ with ctx:
                     json.dump(status, status_fp)
             except IOError:
                 logging.error('I/O error writing status JSON file!')
+
+    if latency_handle is not None:
+        latency_handle.close()
 
 if evnt.rank == 1:
     if args.fftw_output_float_wisdom_file:

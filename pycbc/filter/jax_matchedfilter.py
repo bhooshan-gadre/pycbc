@@ -456,9 +456,12 @@ class JaxLiveBatchMatchedFilter(object):
                  device_id=None,
                  autotune=False, tuning_candidates=(1, 2, 4, 8, 16, 32, 64),
                  tuning_repeats=5, memory_budget_mb=None,
-                 max_batch_latency_ms=None):
+                 max_batch_latency_ms=None, waveform_source="auto"):
         if device_id is not None:
             processing_device_id = device_id
+        if waveform_source not in ('auto', 'bank'):
+            raise ValueError('waveform_source must be auto or bank')
+        self.waveform_source = waveform_source
         self.snr_threshold = snr_threshold
         self.snr_abort_threshold = snr_abort_threshold
         self.newsnr_threshold = newsnr_threshold
@@ -526,6 +529,13 @@ class JaxLiveBatchMatchedFilter(object):
         """Compare the JAX generator to the bank series and to reference models."""
         name = _approximant_name(template)
         h_ref = numpy.array(template, dtype=numpy.complex64, copy=True)
+        if self.waveform_source == 'bank':
+            report = dict(approximant=name, template_id=int(template.id),
+                          implementation='native-bank', use_generated=False,
+                          match_template=1.0, waveform_source='exact native bank')
+            logger.info('JAX waveform source: exact native bank, template %s %s',
+                        template.id, name)
+            return None, report
         distance = 1.0 / __import__('pycbc').DYN_RANGE_FAC
         mass1 = float(_param(template, 'mass1'))
         mass2 = float(_param(template, 'mass2'))
