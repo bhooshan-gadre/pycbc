@@ -1774,7 +1774,9 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         seg_len = int(self.sample_rate * self.psd_segment_length)
         e = len(self.strain)
         s = e - (self.psd_samples + 1) * seg_len // 2
-        psd = pycbc.psd.welch(self.strain[s:e], seg_len=seg_len, seg_stride=seg_len//2)
+        conditioner = getattr(self, 'jax_conditioner', None)
+        welch = conditioner.welch if conditioner and conditioner.mode == 'condition' else pycbc.psd.welch
+        psd = welch(self.strain[s:e], seg_len=seg_len, seg_stride=seg_len//2)
 
         psd.dist = spa_distance(psd, 1.4, 1.4, self.low_frequency_cutoff) * pycbc.DYN_RANGE_FAC
 
@@ -1991,13 +1993,15 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         start = len(self.raw_buffer) - csize * self.factor
         strain = self.raw_buffer[start:]
 
-        strain =  pycbc.filter.highpass_fir(strain, self.highpass_frequency,
-                                       self.highpass_samples,
-                                       beta=self.beta)
-        strain = (strain * self.dyn_range_fac).astype(numpy.float32)
-
-        strain = pycbc.filter.resample_to_delta_t(strain,
-                                           1.0/self.sample_rate, method='ldas')
+        conditioner = getattr(self, 'jax_conditioner', None)
+        if conditioner and conditioner.mode == 'condition':
+            strain = conditioner.condition_raw(strain)
+        else:
+            strain = pycbc.filter.highpass_fir(strain, self.highpass_frequency,
+                                             self.highpass_samples, beta=self.beta)
+            strain = (strain * self.dyn_range_fac).astype(numpy.float32)
+            strain = pycbc.filter.resample_to_delta_t(
+                strain, 1.0/self.sample_rate, method='ldas')
 
         # remove corruption at beginning
         strain = strain[self.corruption:]
@@ -2018,7 +2022,9 @@ class StrainBuffer(pycbc.frame.DataBuffer):
         if self.autogating_threshold is not None:
             autogating_duration_length = self.autogating_duration * self.sample_rate
             autogating_start_sample = int(len(self.strain) - autogating_duration_length)
-            glitch_times = detect_loud_glitches(
+            detect = (conditioner.detect_loud_glitches if conditioner and
+                      conditioner.mode == 'condition' else detect_loud_glitches)
+            glitch_times = detect(
                     self.strain[autogating_start_sample:-self.corruption],
                     psd_duration=self.autogating_psd_segment_length, psd_stride=self.autogating_psd_stride,
                     threshold=self.autogating_threshold,

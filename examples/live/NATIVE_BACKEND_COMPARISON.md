@@ -156,3 +156,8 @@ native example's one coordinator plus one filtering worker. Use `--mpi-ranks 3`
 for two filtering workers/two GPUs, with the same layout for every backend;
 that changes the native example's original MPI partition. Multi-node jobs need
 shared fixture/output paths and identical environments on the participating nodes.
+
+For synchronized per-rank timing profiles, device-resident buffer/conditioning
+options, and optional coordinator GPU preprocessing, see
+[GPU_PERFORMANCE.md](GPU_PERFORMANCE.md). Profile stage costs first, then run
+without profiling to measure throughput.

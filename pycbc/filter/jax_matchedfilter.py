@@ -13,6 +13,7 @@ filter uses that CPU series instead. The comparison is always logged.
 
 import functools
 import logging
+import time as _time
 
 import numpy
 
@@ -167,13 +168,15 @@ def _correlate_kernel():
 
 
 @functools.lru_cache(maxsize=None)
-def _surface_kernel(valid_len):
+def _surface_kernel(valid_len, normalize=True):
     """One compiled surface for a fixed valid-window length.
 
     Input shapes select the duration group. ``valid_start`` is a traced
     scalar, so a new 8 s block does not compile again. ``q`` and ``snr``
     are donated and reused as the frequency product and the normalized
-    surface.
+    surface. With normalize=False the returned buffer is the raw IFFT;
+    live peaks are normalized only after reduction, avoiding a full-size
+    normalization/write and following native peak selection before scaling.
     """
     jax, jnp = _import_jax()
     valid_len = int(valid_len)
@@ -185,17 +188,17 @@ def _surface_kernel(valid_len):
         # peak index matches the unnormalized series. Chi-squared still
         # uses the unnormalized sample, as the CPU veto does.
         surface = snr.at[:, :].set(
-            (unnorm * norms[:, None]).astype(jnp.complex64))
+            (unnorm * norms[:, None]).astype(jnp.complex64) if normalize else unnorm)
         start = (jnp.int32(0), valid_start)
         window = (h.shape[0], valid_len)
         segment = jax.lax.dynamic_slice(surface, start, window)
         unnorm_seg = jax.lax.dynamic_slice(unnorm, start, window)
         power = segment.real * segment.real + segment.imag * segment.imag
-        # First strict maximum of |ρ|^2, matching abs_arg_max.
         local = jnp.argmax(power, axis=-1)
         rows = jnp.arange(h.shape[0])
-        peak = segment[rows, local]
         peak_unnorm = unnorm_seg[rows, local]
+        peak = segment[rows, local] if normalize else peak_unnorm * norms
+
         return q, surface, peak, peak_unnorm, local + valid_start, jnp.abs(peak)
 
     return kernel
@@ -456,11 +459,13 @@ class JaxLiveBatchMatchedFilter(object):
                  device_id=None,
                  autotune=False, tuning_candidates=(1, 2, 4, 8, 16, 32, 64),
                  tuning_repeats=5, memory_budget_mb=None,
-                 max_batch_latency_ms=None, waveform_source="auto"):
+                 max_batch_latency_ms=None, waveform_source="auto", profile_stages=False):
         if device_id is not None:
             processing_device_id = device_id
         if waveform_source not in ('auto', 'bank'):
             raise ValueError('waveform_source must be auto or bank')
+        self.profile_stages = profile_stages
+        self.last_profile = {}
         self.waveform_source = waveform_source
         self.snr_threshold = snr_threshold
         self.snr_abort_threshold = snr_abort_threshold
@@ -686,8 +691,15 @@ class JaxLiveBatchMatchedFilter(object):
             if self.autotune and self.tuning_report is None and not self._tuning:
                 from .jax_tuning import tune_live_filter
                 tune_live_filter(self, data_reader)
+            self.last_profile = {}
             self.set_data(data_reader)
-            return self.process_all()
+            began = _time.perf_counter()
+            result = self.process_all()
+            if self.profile_stages:
+                self.last_profile['filter_total_s'] = _time.perf_counter()-began
+                self.last_profile['host_selection_s'] = max(0.,self.last_profile['filter_total_s']-sum(
+                    self.last_profile.get(k,0.) for k in ['whitening_transfer_s','psd_weights_s','surface_s','vetoes_s']))
+            return result
 
     def process_all(self):
         results = []
@@ -707,7 +719,11 @@ class JaxLiveBatchMatchedFilter(object):
             for key in result:
                 result[key] = result[key][sort]
             links = [links[i] for i in sort]
-        return self._process_vetoes(result, links)
+        began = _time.perf_counter()
+        result = self._process_vetoes(result, links)
+        if self.profile_stages:
+            self.last_profile['vetoes_s'] = _time.perf_counter()-began
+        return result
 
     def _evaluate_surface(self, state, valid_start, valid_len):
         """Normalized ρ(t, φ, θ) and on-device peaks for one duration group."""
@@ -724,13 +740,14 @@ class JaxLiveBatchMatchedFilter(object):
                 state.h, s, state.norms, start, int(valid_len))
             state.snr = None
         else:
-            kernel = _surface_kernel(int(valid_len))
-            q, snr = state.q, state.snr
-            state.q = state.snr = None
+            kernel = _surface_kernel(int(valid_len), normalize=False)
+            q = state.q
+            snr = state.unnorm if state.unnorm is not None else state._snr
+            state.q = state._snr = state.unnorm = None
             q, snr, peak, peak_unnorm, index, abs_snr = kernel(
                 state.h, s, state.norms, q, snr, start)
             state.q = q
-            state.snr = snr
+            state.unnorm = snr
         state.peak = peak
         state.peak_unnorm = peak_unnorm
         state.index = index
@@ -745,17 +762,34 @@ class JaxLiveBatchMatchedFilter(object):
         state = self._states[self.block_id]
         psize = self._lengths[self.block_id]
         delta_f = group[0].delta_f
+        began = _time.perf_counter()
         if delta_f not in self._strain_cache:
-            stilde = self.data.overwhitened_data(delta_f)
-            self._strain_cache[delta_f] = (stilde, state.set_strain(stilde))
+            conditioner = getattr(self.data, 'jax_conditioner', None)
+            if conditioner is not None:
+                stilde, device_strain = conditioner.overwhitened(delta_f)
+            else:
+                stilde = self.data.overwhitened_data(delta_f)
+                device_strain = state.set_strain(stilde)
+            self._strain_cache[delta_f] = (stilde, device_strain)
         stilde, state.strain = self._strain_cache[delta_f]
+        if self.profile_stages:
+            state.strain.block_until_ready()
+            self.last_profile['whitening_transfer_s'] = self.last_profile.get('whitening_transfer_s', 0)+_time.perf_counter()-began
+        began = _time.perf_counter()
         state.ensure_psd(stilde.psd, stilde, self.power_chisq, self.sg_chisq)
+        if self.profile_stages:
+            state.norms.block_until_ready()
+            self.last_profile['psd_weights_s'] = self.last_profile.get('psd_weights_s', 0)+_time.perf_counter()-began
         state.stilde = stilde
 
         valid_end = int(psize - self.data.trim_padding)
         valid_start = int(valid_end - self.data.blocksize * self.data.sample_rate)
         valid_len = int(valid_end - valid_start)
+        began = _time.perf_counter()
         abs_snr = self._evaluate_surface(state, valid_start, valid_len)
+        if self.profile_stages:
+            abs_snr.block_until_ready()
+            self.last_profile['surface_s'] = self.last_profile.get('surface_s', 0)+_time.perf_counter()-began
         self.block_id += 1
 
         jax, _jnp = _import_jax()

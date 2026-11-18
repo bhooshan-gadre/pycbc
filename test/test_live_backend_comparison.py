@@ -40,7 +40,9 @@ def test_plan_reuses_bank_and_only_changes_backend(tmp_path):
     path=tmp_path/'args.json';path.write_text(json.dumps(base))
     out=tmp_path/'runs'
     result=subprocess.run([sys.executable,str(ROOT/'examples/live/run_backend_comparison.py'),
-        '--example-dir',str(tmp_path),'--args-json',str(path),'--output',str(out),'--plan-only'],
+        '--example-dir',str(tmp_path),'--args-json',str(path),'--output',str(out),'--plan-only',
+        '--profile-stages','--jax-preprocessing','condition','--coordinator-gpu',
+        '--allow-gpu-sharing'],
         text=True,capture_output=True)
     assert result.returncode == 0,result.stdout+result.stderr
     m=json.loads((out/'runs.json').read_text())
@@ -51,8 +53,12 @@ def test_plan_reuses_bank_and_only_changes_backend(tmp_path):
         assert '--run-snr-optimization' not in row['command']
         assert '--foo bar' not in row['command']
         assert runner.values(row['command'],'--bank-file') == ['bank.hdf']
+        assert '--stage-profile-dir' in row['command']
+        assert ('--jax-coordinator-preprocessing' in row['command']) == (row['mode'] == 'jax_gpu')
+        assert ('--jax-allow-gpu-sharing' in row['command']) == (row['mode'] == 'jax_gpu')
         if row['mode'] != 'native':
             assert runner.values(row['command'],'--jax-waveform-source') == ['bank']
+            assert runner.values(row['command'],'--jax-preprocessing') == ['condition']
     # Preparation/comparison must never delete the native example output.
     (tmp_path/'output').mkdir();(tmp_path/'output'/'keep.txt').write_text('keep')
     assert (tmp_path/'output'/'keep.txt').read_text()=='keep'

@@ -11,6 +11,7 @@ See https://arxiv.org/abs/1805.11174 for an overview."""
 
 import sys
 import time
+_python_entry_start = time.perf_counter()
 import argparse, numpy, pycbc, logging, cProfile, h5py, json
 import os.path
 import itertools
@@ -964,6 +965,11 @@ parser.add_argument('--jax-platform', choices=['cpu', 'gpu'], default='cpu',
                          'GPU assignment uses --jax-device-id and respects scheduler visibility.')
 parser.add_argument('--jax-waveform-source', choices=['auto', 'bank'], default='auto',
                     help='bank filters the exact native waveform arrays, including SEOBNRv4_ROM')
+parser.add_argument('--jax-coordinator-preprocessing', action='store_true',
+                    help='Also offload rank-0 conditioning; reserves an additional GPU unless sharing is explicitly allowed')
+parser.add_argument('--jax-preprocessing', choices=['off','whiten','condition'], default='off',
+                    help='Device rolling buffer/whitening; condition also enables JAX FIR, Welch and glitch spectral math')
+parser.add_argument('--stage-profile-dir', help='Write per-rank synchronized stage timings (profiling adds synchronization)')
 parser.add_argument('--latency-log', help='Rank-0 per-block monotonic timings in JSONL (new file)')
 parser.add_argument('--jax-device-id', default='auto',
                     help='auto assigns distinct scheduler-visible GPUs per node; or a visible index')
@@ -1123,8 +1129,11 @@ ctx = scheme.from_cli(args)
 fft.from_cli(args)
 _this_filter_backend = filter_backend_for_rank(args, mpi.COMM_WORLD.Get_rank())
 from pycbc.filter.jax_devices import bind_mpi_gpu
+if args.jax_coordinator_preprocessing and (args.jax_platform != 'gpu' or args.jax_preprocessing != 'condition'):
+    parser.error('--jax-coordinator-preprocessing requires --jax-platform gpu --jax-preprocessing condition')
 _jax_binding = bind_mpi_gpu(
-    mpi.COMM_WORLD, _this_filter_backend == 'jax' and args.jax_platform == 'gpu',
+    mpi.COMM_WORLD, (_this_filter_backend == 'jax' and args.jax_platform == 'gpu') or
+                   (mpi.COMM_WORLD.Get_rank() == 0 and args.jax_coordinator_preprocessing),
     requested=args.jax_device_id, allow_sharing=args.jax_allow_gpu_sharing)
 if _jax_binding:
     logging.info('JAX GPU binding: %s', _jax_binding)
@@ -1199,7 +1208,9 @@ with ctx:
             print(e)
             exit()
 
+    _filter_setup_s = 0.
     if evnt.rank > 0:
+        _filter_setup_start = time.perf_counter()
         bank.table.sort(order='mchirp')
         waveforms = list(bank[evnt.rank-1::evnt.size-1])
         check_max_length(args, waveforms)
@@ -1219,6 +1230,7 @@ with ctx:
                 jax_platform=args.jax_platform,
                 device_id=0,
                 waveform_source=args.jax_waveform_source,
+                profile_stages=bool(args.stage_profile_dir),
                 autotune=args.jax_autotune,
                 tuning_candidates=args.jax_tuning_candidates,
                 tuning_repeats=args.jax_tuning_repeats,
@@ -1236,6 +1248,8 @@ with ctx:
                 max_triggers_in_batch=args.max_triggers_in_batch,
                 maxelements=args.max_batch_size
             )
+
+        _filter_setup_s = time.perf_counter()-_filter_setup_start
 
     # Synchronize start time if not provided on the command line
     if not args.start_time:
@@ -1256,6 +1270,17 @@ with ctx:
         for ifo in (evnt.ifos if evnt.rank == 0 else evnt.trigg_ifos)
     }
     evnt.data_readers = data_reader
+    _conditioning_device = None
+    if evnt.rank > 0 and filter_backend == 'jax' and args.jax_preprocessing != 'off':
+        _conditioning_device = mf.device
+    elif evnt.rank == 0 and args.jax_coordinator_preprocessing:
+        from pycbc.filter.jax_matchedfilter import configure_jax
+        _conditioning_device, _ = configure_jax('gpu',0)
+    if _conditioning_device is not None:
+        from pycbc.strain.jax_live import JaxLiveConditioner
+        for reader in data_reader.values():
+            reader.jax_conditioner = JaxLiveConditioner(reader, _conditioning_device, args.jax_preprocessing)
+        logging.info('JAX preprocessing %s on %s', args.jax_preprocessing, _conditioning_device)
 
     # create single-detector background "estimators"
     if analyze_singles and evnt.rank == 0:
@@ -1322,6 +1347,17 @@ with ctx:
     }
     psd_var_filts = {ifo: None for ifo in evnt.trigg_ifos}
 
+    profile_handle = None
+    if args.stage_profile_dir:
+        os.makedirs(args.stage_profile_dir, exist_ok=True)
+        profile_handle = open(os.path.join(args.stage_profile_dir, 'rank%s.jsonl' % evnt.rank), 'x', buffering=1)
+        profile_handle.write(json.dumps(dict(phase='startup', rank=evnt.rank,
+            setup_to_loop_s=time.perf_counter()-_python_entry_start,
+            template_filter_setup_s=_filter_setup_s,
+            templates=len(waveforms) if evnt.rank > 0 else 0,
+            jax_device=str(mf.device) if evnt.rank > 0 and filter_backend == 'jax' else None,
+            device_kind=mf.device.device_kind if evnt.rank > 0 and filter_backend == 'jax' else None,
+            preprocessing_device=str(_conditioning_device) if _conditioning_device is not None else None))+'\n')
     latency_handle = None
     if args.latency_log and evnt.rank == 0:
         latency_handle = open(args.latency_log, 'x', buffering=1)
@@ -1332,14 +1368,19 @@ with ctx:
         logging.info('Analyzing from %s', data_end())
 
         results = {}
+        stage_profile = dict(phase='block', rank=evnt.rank, gps_start=block_gps_start, backend=filter_backend, detectors={})
         evnt.live_detectors = set()
 
         for ifo in (evnt.ifos if evnt.rank == 0 else evnt.trigg_ifos):
             results[ifo] = False
+            stage_began = time.perf_counter()
             status = data_reader[ifo].advance(
                 valid_pad,
                 timeout=args.frame_read_timeout
             )
+            det_profile = dict(advance_s=time.perf_counter()-stage_began)
+            stage_profile['detectors'][ifo] = det_profile
+            stage_began = time.perf_counter()
             if status and psd_count[ifo] == 0:
                 status = data_reader[ifo].recalculate_psd()
                 # If the psd has been recalculated then we need a new
@@ -1356,17 +1397,29 @@ with ctx:
                 args.max_psd_abort_distance
             )
 
+            det_profile['psd_check_s'] = time.perf_counter()-stage_began
+            det_profile['analyzable'] = bool(status)
+            conditioner = getattr(data_reader[ifo], 'jax_conditioner', None)
+            if conditioner: det_profile['device_buffer'] = conditioner.metrics.copy()
             if status is True:
                 if ifo not in evnt.skymap_only_ifos:
                     evnt.live_detectors.add(ifo)
                     if evnt.rank > 0:
                         logging.info('Filtering %s', ifo)
+                        stage_began = time.perf_counter()
                         results[ifo] = mf.process_data(data_reader[ifo])
+                        det_profile['filter_s'] = time.perf_counter()-stage_began
+                        if args.stage_profile_dir and filter_backend == 'jax':
+                            det_profile['jax'] = mf.last_profile.copy()
+                            conditioner = getattr(data_reader[ifo], 'jax_conditioner', None)
+                            if conditioner: det_profile['device_buffer'] = conditioner.metrics.copy()
             else:
                 logging.info('Insufficient data for %s analysis', ifo)
 
+        stage_began = time.perf_counter()
         if evnt.rank > 0:
             evnt.commit_results((results, data_end()))
+            stage_profile['mpi_s'] = time.perf_counter()-stage_began
         else:
             psds = {ifo: data_reader[ifo].psd for ifo in data_reader
                          if data_reader[ifo].psd is not None}
@@ -1374,6 +1427,8 @@ with ctx:
             # Collect together the single detector triggers
             if evnt.size > 1:
                 results, valid_end = evnt.gather_results()
+            stage_profile['mpi_s'] = time.perf_counter()-stage_began
+            stage_began = time.perf_counter()
 
             # veto detectors with different state between the root
             # and worker nodes (e.g. late frame files on one node only)
@@ -1522,6 +1577,11 @@ with ctx:
                      tdiff, tdiff / valid_pad, lag, len(evnt.live_detectors)
         )
 
+        if profile_handle is not None:
+            stage_profile['gps_end'] = float(data_end())
+            stage_profile['block_s'] = time.perf_counter()-block_started_monotonic
+            if evnt.rank == 0: stage_profile['postprocess_s'] = time.perf_counter()-stage_began
+            profile_handle.write(json.dumps(stage_profile)+'\n')
         if latency_handle is not None:
             latency_handle.write(json.dumps(dict(
                 gps_start=block_gps_start, gps_end=float(data_end()),
@@ -1555,6 +1615,8 @@ with ctx:
             except IOError:
                 logging.error('I/O error writing status JSON file!')
 
+    if profile_handle is not None:
+        profile_handle.close()
     if latency_handle is not None:
         latency_handle.close()
 

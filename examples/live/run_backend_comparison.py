@@ -87,6 +87,10 @@ def main():
     p.add_argument('--mpi-ranks', type=int, default=2, help='Same total ranks for all modes; native example uses 2')
     p.add_argument('--launcher', default='mpirun')
     p.add_argument('--launcher-arg', action='append', default=[], help='Repeat; use --launcher-arg=VALUE for dash-prefixed values')
+    p.add_argument('--coordinator-gpu', action='store_true', help='Also reserve a GPU for rank-0 conditioning (condition mode)')
+    p.add_argument('--allow-gpu-sharing', action='store_true', help='Explicitly permit coordinator/worker GPU sharing')
+    p.add_argument('--profile-stages', action='store_true', help='Record per-rank stage timings with GPU synchronization')
+    p.add_argument('--jax-preprocessing', choices=['off','whiten','condition'], default='off')
     p.add_argument('--autotune', action='store_true', help='Enable JAX tuning; startup cost stays in wall time')
     p.add_argument('--memory-budget-mb', type=float)
     p.add_argument('--args-json', type=Path, help='Advanced: fixed native search argv JSON, instead of shared example options')
@@ -94,6 +98,8 @@ def main():
     args = p.parse_args()
     if args.repeats < 1 or args.mpi_ranks < 2 or len(set(args.modes)) != len(args.modes) or 'native' not in args.modes:
         p.error('positive repeats, >=2 MPI ranks and unique modes including native required')
+    if args.coordinator_gpu and args.jax_preprocessing != 'condition':
+        p.error('--coordinator-gpu requires --jax-preprocessing condition')
     out = args.output.resolve(); directory = args.example_dir.resolve()
     if out.exists() and any(out.iterdir()):
         p.error('Use a new or empty output directory')
@@ -144,8 +150,15 @@ def main():
                 argv = replace(base, '--output-path', run/'output')
                 argv += ['--latency-log', str(run/'latency.jsonl'),
                          '--filter-backend','cpu' if mode == 'native' else 'jax']
+                if args.profile_stages:
+                    argv += ['--stage-profile-dir',str(run/'stages')]
                 if mode != 'native':
-                    argv += ['--jax-platform', mode[4:], '--jax-waveform-source','bank']
+                    argv += ['--jax-platform', mode[4:], '--jax-waveform-source','bank',
+                             '--jax-preprocessing',args.jax_preprocessing]
+                    if mode == 'jax_gpu' and args.coordinator_gpu:
+                        argv += ['--jax-coordinator-preprocessing']
+                    if mode == 'jax_gpu' and args.allow_gpu_sharing:
+                        argv += ['--jax-allow-gpu-sharing']
                     if args.autotune:
                         argv += ['--jax-autotune']
                     if args.memory_budget_mb is not None:
